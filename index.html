@@ -47,14 +47,7 @@
 <body>
     <h1>CSVファイル処理システム</h1>
     <div id="fileInputs">
-        <div class="step" id="step1">
-            <p>Step 1: ファイルAとファイルBを処理</p>
-            <div>
-                <input type="file" id="fileA" accept=".csv">
-                <input type="file" id="fileB" accept=".csv">
-            </div>
-            <button onclick="processStep(1)">処理を実行 (ファイルA & ファイルB)</button>
-        </div>
+
         <div class="step" id="step2" class="hidden">
             <p>Step 2: 中間ファイルCとファイルDを処理</p>
             <div>
@@ -91,7 +84,15 @@
     <div id="processFlow">
         <p>進捗:</p>
         <ul>
-            <li id="flowStep1" class="not-started">Step 1: ファイルAとファイルBを処理</li>
+            <li id="flowStep1" class="not-started">Step 1: ファイルAとファイルBを処理
+                    <div class="step" id="step1">
+            <p>Step 1: ファイルAとファイルBを処理</p>
+            <div>
+                <input type="file" id="fileA" accept=".csv">
+                <input type="file" id="fileB" accept=".csv">
+            </div>
+            <button onclick="processStep(1)">処理を実行 (ファイルA & ファイルB)</button>
+        </div></li>
             <li id="flowStep2" class="not-started">Step 2: 中間ファイルCとファイルDを処理</li>
             <li id="flowStep3" class="not-started">Step 3: 中間ファイルEとファイルFを処理</li>
             <li id="flowStep4" class="not-started">Step 4: 中間ファイルGとファイルHを処理</li>
