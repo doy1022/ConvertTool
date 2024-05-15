@@ -14,6 +14,7 @@ function processStep(step) {
     
     if (!file1 || !file2) {
         alert('ファイルを選択してください。');
+        setError(step);
         return;
     }
     
@@ -26,36 +27,31 @@ function processStep(step) {
             const content2 = e.target.result;
             const intermediateContent = mergeCSV(content1, content2);
             downloadFile(`intermediate${step}.csv`, intermediateContent);
-            updateProgress(step);
-            showNextStep(step);
+            updateProgress(step, 'completed');
+            if (step < 5) {
+                showNextStep(step);
+                updateProgress(step + 1, 'current');
+            }
         };
         reader2.readAsText(file2);
     };
     reader1.readAsText(file1);
+    updateProgress(step, 'current');
 }
 
 function showNextStep(currentStep) {
-    if (currentStep < 5) {
-        const nextStep = currentStep + 1;
-        document.getElementById(`step${nextStep}`).classList.remove('hidden');
-        document.getElementById(`flowStep${nextStep}`).classList.remove('hidden');
-    }
+    const nextStep = currentStep + 1;
+    document.getElementById(`step${nextStep}`).classList.remove('hidden');
 }
 
-function updateProgress(currentStep) {
-    for (let i = 1; i <= 5; i++) {
-        const flowStep = document.getElementById(`flowStep${i}`);
-        if (i < currentStep) {
-            flowStep.classList.add('completed');
-            flowStep.classList.remove('current');
-        } else if (i === currentStep) {
-            flowStep.classList.add('current');
-            flowStep.classList.remove('completed');
-        } else {
-            flowStep.classList.remove('current');
-            flowStep.classList.remove('completed');
-        }
-    }
+function updateProgress(step, status) {
+    const flowStep = document.getElementById(`flowStep${step}`);
+    flowStep.classList.remove('not-started', 'current', 'completed', 'error');
+    flowStep.classList.add(status);
+}
+
+function setError(step) {
+    updateProgress(step, 'error');
 }
 
 function mergeCSV(content1, content2) {
