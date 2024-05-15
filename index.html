@@ -14,34 +14,6 @@
             font-weight: bold;
             color: blue;
         }
-        #processFlow {
-            margin-top: 20px;
-        }
-        #processFlow ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        #processFlow li {
-            margin: 5px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        #processFlow .not-started {
-            background-color: #f0f0f0;
-        }
-        #processFlow .completed {
-            background-color: #e0ffe0;
-            color: blue;
-        }
-        #processFlow .current {
-            background-color: #cce5ff;
-            color: green;
-        }
-        #processFlow .error {
-            background-color: #ffcccc;
-            color: red;
-        }
     </style>
 </head>
 <body>
@@ -50,37 +22,15 @@
         <div class="step" id="step1">
             <input type="file" id="fileA" accept=".csv">
             <input type="file" id="fileB" accept=".csv">
-            <button onclick="processStep(1)">処理を実行 (ファイルA & ファイルB)</button>
-        </div>
-        <div class="step" id="step2">
-            <input type="file" id="fileC" accept=".csv">
-            <input type="file" id="fileD" accept=".csv">
-            <button onclick="processStep(2)">処理を実行 (中間ファイルC & ファイルD)</button>
-        </div>
-        <div class="step" id="step3">
-            <input type="file" id="fileE" accept=".csv">
-            <input type="file" id="fileF" accept=".csv">
-            <button onclick="processStep(3)">処理を実行 (中間ファイルE & ファイルF)</button>
-        </div>
-        <div class="step" id="step4">
-            <input type="file" id="fileG" accept=".csv">
-            <input type="file" id="fileH" accept=".csv">
-            <button onclick="processStep(4)">処理を実行 (中間ファイルG & ファイルH)</button>
-        </div>
-        <div class="step" id="step5">
-            <input type="file" id="fileI" accept=".csv">
-            <input type="file" id="fileJ" accept=".csv">
-            <button onclick="processStep(5)">処理を実行 (中間ファイルI & ファイルJ)</button>
+            <button onclick="processStep1()">処理を実行 (ファイルA & ファイルB)</button>
         </div>
     </div>
     <div id="processFlow">
         <p>進捗:</p>
         <ul>
-            <li id="flowStep1" class="not-started">Step 1: ファイルAとファイルBを処理</li>
-            <li id="flowStep2" class="not-started">Step 2: 中間ファイルCとファイルDを処理</li>
-            <li id="flowStep3" class="not-started">Step 3: 中間ファイルEとファイルFを処理</li>
-            <li id="flowStep4" class="not-started">Step 4: 中間ファイルGとファイルHを処理</li>
-            <li id="flowStep5" class="not-started">Step 5: 中間ファイルIとファイルJを処理</li>
+            <li id="flowStep1">Step 1: ファイルAとファイルBを処理</li>
+            <li id="flowStep2" class="hidden">Step 2: 中間ファイルCとファイルDを処理</li>
+            <!-- 必要に応じて追加 -->
         </ul>
     </div>
     <script src="script.js"></script>
