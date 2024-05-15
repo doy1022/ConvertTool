@@ -48,28 +48,43 @@
     <h1>CSVファイル処理システム</h1>
     <div id="fileInputs">
         <div class="step" id="step1">
-            <input type="file" id="fileA" accept=".csv">
-            <input type="file" id="fileB" accept=".csv">
+            <p>Step 1: ファイルAとファイルBを処理</p>
+            <div>
+                <input type="file" id="fileA" accept=".csv">
+                <input type="file" id="fileB" accept=".csv">
+            </div>
             <button onclick="processStep(1)">処理を実行 (ファイルA & ファイルB)</button>
         </div>
-        <div class="step" id="step2">
-            <input type="file" id="fileC" accept=".csv">
-            <input type="file" id="fileD" accept=".csv">
+        <div class="step" id="step2" class="hidden">
+            <p>Step 2: 中間ファイルCとファイルDを処理</p>
+            <div>
+                <input type="file" id="fileC" accept=".csv">
+                <input type="file" id="fileD" accept=".csv">
+            </div>
             <button onclick="processStep(2)">処理を実行 (中間ファイルC & ファイルD)</button>
         </div>
-        <div class="step" id="step3">
-            <input type="file" id="fileE" accept=".csv">
-            <input type="file" id="fileF" accept=".csv">
+        <div class="step" id="step3" class="hidden">
+            <p>Step 3: 中間ファイルEとファイルFを処理</p>
+            <div>
+                <input type="file" id="fileE" accept=".csv">
+                <input type="file" id="fileF" accept=".csv">
+            </div>
             <button onclick="processStep(3)">処理を実行 (中間ファイルE & ファイルF)</button>
         </div>
-        <div class="step" id="step4">
-            <input type="file" id="fileG" accept=".csv">
-            <input type="file" id="fileH" accept=".csv">
+        <div class="step" id="step4" class="hidden">
+            <p>Step 4: 中間ファイルGとファイルHを処理</p>
+            <div>
+                <input type="file" id="fileG" accept=".csv">
+                <input type="file" id="fileH" accept=".csv">
+            </div>
             <button onclick="processStep(4)">処理を実行 (中間ファイルG & ファイルH)</button>
         </div>
-        <div class="step" id="step5">
-            <input type="file" id="fileI" accept=".csv">
-            <input type="file" id="fileJ" accept=".csv">
+        <div class="step" id="step5" class="hidden">
+            <p>Step 5: 中間ファイルIとファイルJを処理</p>
+            <div>
+                <input type="file" id="fileI" accept=".csv">
+                <input type="file" id="fileJ" accept=".csv">
+            </div>
             <button onclick="processStep(5)">処理を実行 (中間ファイルI & ファイルJ)</button>
         </div>
     </div>
