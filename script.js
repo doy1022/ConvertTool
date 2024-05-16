@@ -1,4 +1,4 @@
-// script.js
+// script.js aaa
 
 function processStep(step) {
     const fileInputIds = [
