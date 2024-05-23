@@ -1,5 +1,4 @@
 // CSVファイルのマージ
-// aaaaaaaaabbbbbb
 function mergeCSV() {
     const file1 = document.getElementById('file1').files[0];
     const file2 = document.getElementById('file2').files[0];
