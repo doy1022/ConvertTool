@@ -53,7 +53,7 @@ function processCSV(csv1, csv2) {
             const mergedRow = mergedHeader.map(col => {
                 const index1 = header1.indexOf(col);
                 const index2 = header2.indexOf(col);
-                return index1 !== -1 ? row1[index1] : row2[index2];
+                return index1 !== -1 ? row1[index1] : (index2 !== -1 ? row2[index2] : '');
             });
             mergedData.push(mergedRow);
         }
