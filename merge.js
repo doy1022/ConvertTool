@@ -23,27 +23,24 @@ function mergeCSV() {
 }
 
 function processCSV(csv1, csv2) {
-    const parseCSV = (csv) => csv.split('\n').map(line => line.split(','));
-    const csvToObject = (csv, commonHeader) => {
-        const [header, ...data] = parseCSV(csv);
-        const commonIndex = header.indexOf(commonHeader);
-        if (commonIndex === -1) {
-            throw new Error(`「${commonHeader}」カラムが見つかりません。`);
-        }
-        return {
-            header,
-            data: data.map(row => ({ key: row[commonIndex], row }))
-        };
+    const parseCSV = (csv) => {
+        return csv.trim().split('\n').map(line => line.split(','));
     };
 
-    const commonHeader = "宛名番号";
-    const { header: header1, data: data1 } = csvToObject(csv1, commonHeader);
-    const { header: header2, data: data2 } = csvToObject(csv2, commonHeader);
+    const csvToObject = (csv) => {
+        const [header, ...data] = parseCSV(csv);
+        const commonIndex = header.indexOf('宛名番号');
+        if (commonIndex === -1) {
+            throw new Error('「宛名番号」カラムが見つかりません。');
+        }
+        const map = new Map(data.map(row => [row[commonIndex], row]));
+        return { header, map };
+    };
+
+    const { header: header1, map: map1 } = csvToObject(csv1);
+    const { header: header2, map: map2 } = csvToObject(csv2);
 
     const mergedHeader = Array.from(new Set([...header1, ...header2]));
-    const map1 = new Map(data1.map(({ key, row }) => [key, row]));
-    const map2 = new Map(data2.map(({ key, row }) => [key, row]));
-
     const mergedData = [];
 
     map1.forEach((row1, key) => {
