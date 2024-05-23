@@ -103,27 +103,43 @@ function handleFile() {
     }
 }
 
-// 単身世帯の世帯主が死亡している住民を除外する処理
-function filterDeath() {
-    const fileInput = document.getElementById('csvFile2');
+// 世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている行を除外する処理
+function filterSingleHouseholds() {
+    const fileInput = document.getElementById('csvFile');
     const file = fileInput.files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = function (event) {
             const text = event.target.result;
             const lines = text.split('\n').map(line => line.split(','));
-            const headerIndex = lines[0].indexOf('賦課');
-            if (headerIndex === -1) {
-                alert('賦課列が見つかりません。');
+
+            // ヘッダー行から必要な列のインデックスを取得
+            const headers = lines[0];
+            const membersIndex = headers.indexOf('世帯員の人数');
+            const removalDateIndex = headers.indexOf('消除日');
+            const notificationDateIndex = headers.indexOf('消除届出日');
+            const reasonCodeIndex = headers.indexOf('消除事由コード');
+
+            // これらの項目が見つからない場合のエラーハンドリング
+            if (membersIndex === -1 || removalDateIndex === -1 || notificationDateIndex === -1 || reasonCodeIndex === -1) {
+                alert('必要なヘッダーがいずれか見つかりません。');
                 return;
             }
 
+            // 条件にマッチしない行をフィルタリング
             const filteredLines = lines.filter((line, index) => {
-                return index === 0 || line[headerIndex] !== '課税対象';
+                // ヘッダー行は常に含める
+                if (index === 0) return true;
+
+                // 条件：世帯員の人数が1ではない、または、任意の消除関連フィールドが空である
+                return !(line[membersIndex] === '1' &&
+                         line[removalDateIndex].trim() !== '' &&
+                         line[notificationDateIndex].trim() !== '' &&
+                         line[reasonCodeIndex].trim() !== '');
             });
 
             const output = filteredLines.map(line => line.join(',')).join('\n');
-            downloadCSV(output, 'filtered.csv');
+            downloadCSV(output, 'filtered_single_households.csv');
         };
         reader.readAsText(file);
     } else {
