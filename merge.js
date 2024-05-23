@@ -1,3 +1,4 @@
+// CSVファイルのマージ
 function mergeCSV() {
     const file1 = document.getElementById('file1').files[0];
     const file2 = document.getElementById('file2').files[0];
@@ -26,56 +27,55 @@ function mergeCSV() {
     reader1.readAsText(file1);
 }
 
+// CSVファイルの解析
 function parseCSV(csv) {
-    return csv.trim().split('\n').map(line => line.split(','));
+    const lines = csv.split('\n').map(line => line.trim()).filter(line => line);
+    const header = lines[0].split(',');
+    const rows = lines.slice(1).map(line => line.split(','));
+    return { header, rows };
 }
 
-function csvToObject(csv) {
-    const [header, ...data] = parseCSV(csv);
-    const commonIndex = header.indexOf('宛名番号');
-    if (commonIndex === -1) {
-        throw new Error('「宛名番号」カラムが見つかりません。');
-    }
-    const map = new Map(data.map(row => [row[commonIndex], row]));
-    return { header, map };
+// 配列をオブジェクトに変換
+function arrayToObj(headers, row) {
+    const obj = {};
+    headers.forEach((header, i) => {
+        obj[header] = row[i];
+    });
+    return obj;
 }
 
+// CSVファイルのマージ処理
 function processCSV(csv1, csv2) {
-    const { header: header1, map: map1 } = csvToObject(csv1);
-    const { header: header2, map: map2 } = csvToObject(csv2);
+    const { header: header1, rows: rows1 } = parseCSV(csv1);
+    const { header: header2, rows: rows2 } = parseCSV(csv2);
 
-    // 共通ヘッダーの決定
-    const mergedHeader = Array.from(new Set([...header1, ...header2]));
+    // 両ファイルのヘッダーをマージして重複を排除
+    const fullHeader = Array.from(new Set([...header1, ...header2]));
 
-    // データのマージ
-    const mergedData = [];
+    // 重複カラム「宛名番号」のインデックスを見つける
+    const index1 = header1.indexOf('宛名番号');
+    const index2 = header2.indexOf('宛名番号');
 
-    map1.forEach((row1, key) => {
-        if (map2.has(key)) {
-            const row2 = map2.get(key);
-            const mergedRow = {};
-
-            // header1からデータを取得
-            header1.forEach((h, i) => {
-                mergedRow[h] = row1[i];
-            });
-
-            // header2からデータを取得し、マージ
-            header2.forEach((h, i) => {
-                if (mergedRow[h] === undefined) {
-                    mergedRow[h] = row2[i];
-                }
-            });
-
-            // 最終的な行を作成
-            const finalRow = mergedHeader.map(h => mergedRow[h] || '');
-            mergedData.push(finalRow.join(','));
-        }
+    // マップを作成してデータを整理
+    const map = new Map();
+    rows1.forEach(row => {
+        map.set(row[index1], {...map.get(row[index1]), ...arrayToObj(header1, row)});
+    });
+    rows2.forEach(row => {
+        map.set(row[index2], {...map.get(row[index2]), ...arrayToObj(header2, row)});
     });
 
-    return [mergedHeader.join(','), ...mergedData].join('\n');
+    // マージしたデータを出力形式に変換
+    const output = [fullHeader.join(',')];
+    map.forEach((value, key) => {
+        const row = fullHeader.map(header => value[header] || '');
+        output.push(row.join(','));
+    });
+
+    return output.join('\n');
 }
 
+// CSVファイルのダウンロード
 function downloadCSV(csvContent, filename) {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
