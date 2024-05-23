@@ -1,8 +1,3 @@
-document.getElementById('csvForm').addEventListener('submit', function(event) {
-    event.preventDefault();
-    mergeCSV();
-});
-
 function mergeCSV() {
     const file1 = document.getElementById('file1').files[0];
     const file2 = document.getElementById('file2').files[0];
@@ -28,28 +23,27 @@ function mergeCSV() {
 }
 
 function processCSV(csv1, csv2) {
-    const lines1 = csv1.split('\n').map(line => line.split(','));
-    const lines2 = csv2.split('\n').map(line => line.split(','));
-
-    const header1 = lines1[0];
-    const header2 = lines2[0];
-    
-    const data1 = lines1.slice(1);
-    const data2 = lines2.slice(1);
+    const parseCSV = (csv) => csv.split('\n').map(line => line.split(','));
+    const csvToObject = (csv, commonHeader) => {
+        const [header, ...data] = parseCSV(csv);
+        const commonIndex = header.indexOf(commonHeader);
+        if (commonIndex === -1) {
+            throw new Error(`「${commonHeader}」カラムが見つかりません。`);
+        }
+        return {
+            header,
+            data: data.map(row => ({ key: row[commonIndex], row }))
+        };
+    };
 
     const commonHeader = "宛名番号";
-    const commonIndex1 = header1.indexOf(commonHeader);
-    const commonIndex2 = header2.indexOf(commonHeader);
+    const { header: header1, data: data1 } = csvToObject(csv1, commonHeader);
+    const { header: header2, data: data2 } = csvToObject(csv2, commonHeader);
 
-    if (commonIndex1 === -1 || commonIndex2 === -1) {
-        alert("両方のCSVファイルに「宛名番号」カラムが必要です。");
-        return;
-    }
+    const mergedHeader = Array.from(new Set([...header1, ...header2]));
+    const map1 = new Map(data1.map(({ key, row }) => [key, row]));
+    const map2 = new Map(data2.map(({ key, row }) => [key, row]));
 
-    const map1 = new Map(data1.map(row => [row[commonIndex1], row]));
-    const map2 = new Map(data2.map(row => [row[commonIndex2], row]));
-
-    const mergedHeader = [...new Set([...header1, ...header2])];
     const mergedData = [];
 
     map1.forEach((row1, key) => {
