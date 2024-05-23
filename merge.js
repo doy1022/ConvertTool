@@ -43,13 +43,20 @@ function processCSV(csv1, csv2) {
     const mergedHeader = Array.from(new Set([...header1, ...header2]));
     const mergedData = [];
 
+    // 合わせる共通のキーを抽出してマージ
     map1.forEach((row1, key) => {
         if (map2.has(key)) {
             const row2 = map2.get(key);
             const mergedRow = mergedHeader.map(col => {
                 const index1 = header1.indexOf(col);
                 const index2 = header2.indexOf(col);
-                return index1 !== -1 ? row1[index1] : row2[index2];
+                if (index1 !== -1 && row1.length > index1) {
+                    return row1[index1];
+                } else if (index2 !== -1 && row2.length > index2) {
+                    return row2[index2];
+                } else {
+                    return '';
+                }
             });
             mergedData.push(mergedRow);
         }
