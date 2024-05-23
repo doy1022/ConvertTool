@@ -12,7 +12,7 @@
         <input type="file" id="file1" accept=".csv"><br><br>
         <label for="file2">税情報ファイルをアップロードして下さい:</label>
         <input type="file" id="file2" accept=".csv"><br><br>
-        <button type="button" onclick="mergeCSV()">マージしてダウンロードする</button>
+        <button type="button" onclick="mergeCSV()">マージしたファイルをダウンロードする</button>
     </form>
     <script src="merge.js"></script>
 </body>
@@ -27,7 +27,7 @@
     <form id="csvForm">
         <label for="file1">住基情報＋税情報ファイルをアップロードして下さい:</label>
         <input type="file" id="file1" accept=".csv"><br><br>
-        <button type="button" onclick="mergeCSV()">課税対象の住民を除外する</button>
+        <button type="button" onclick="handleFile()">課税対象の住民を除外したファイルをダウンロードする</button>
     </form>
     <script src="merge.js"></script>
 </body>
