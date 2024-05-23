@@ -44,22 +44,24 @@ function processCSV(csv1, csv2) {
     const { header: header1, map: map1 } = csvToObject(csv1);
     const { header: header2, map: map2 } = csvToObject(csv2);
 
-    const mergedHeader = Array.from(new Set([...header1, ...header2]));
+    // 共通ヘッダーを作成
+    const mergedHeader = Array.from(new Set([...header1, ...header2].sort((a, b) => a.localeCompare(b))));
     const mergedData = [];
 
     map1.forEach((row1, key) => {
         if (map2.has(key)) {
             const row2 = map2.get(key);
-            const mergedRow = mergedHeader.map(col => {
-                const index1 = header1.indexOf(col);
-                const index2 = header2.indexOf(col);
-                return index1 !== -1 ? row1[index1] : (index2 !== -1 ? row2[index2] : '');
+            const mergedRow = mergedHeader.map(header => {
+                const index1 = header1.indexOf(header);
+                const index2 = header2.indexOf(header);
+                // headerがheader1とheader2のどちらにも存在すればそのデータを使用
+                return (index1 !== -1 ? row1[index1] : '') || (index2 !== -1 ? row2[index2] : '');
             });
-            mergedData.push(mergedRow);
+            mergedData.push(mergedRow.join(','));
         }
     });
 
-    return [mergedHeader, ...mergedData].map(row => row.join(',')).join('\n');
+    return [mergedHeader.join(','), ...mergedData].join('\n');
 }
 
 function downloadCSV(csvContent, filename) {
