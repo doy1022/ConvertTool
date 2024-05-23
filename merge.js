@@ -103,8 +103,7 @@ function processCSV(csv1, csv2) {
             }
         }
 
-
-// CSVファイルのダウンロード
+// CSVファイルをダウンロード
 function downloadCSV(csvContent, filename) {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
