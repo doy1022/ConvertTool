@@ -104,6 +104,7 @@ function handleFile() {
 }
 
 // 世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている行を除外する処理
+// 「世帯員の人数が1」の判定に関して、おそらく「住基情報内「ＦＯ－世帯番号」が同じである」という条件に回収する必要がある
 function filterDeath() {
     const fileInput = document.getElementById('csvFile2');
     const file = fileInput.files[0];
