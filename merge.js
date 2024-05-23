@@ -11,9 +11,9 @@ function mergeCSV() {
     const reader1 = new FileReader();
     const reader2 = new FileReader();
 
-    reader1.onload = function(e1) {
+    reader1.onload = function (e1) {
         const csv1 = e1.target.result;
-        reader2.onload = function(e2) {
+        reader2.onload = function (e2) {
             const csv2 = e2.target.result;
             try {
                 const mergedCSV = processCSV(csv1, csv2);
@@ -59,10 +59,10 @@ function processCSV(csv1, csv2) {
     // マップを作成してデータを整理
     const map = new Map();
     rows1.forEach(row => {
-        map.set(row[index1], {...map.get(row[index1]), ...arrayToObj(header1, row)});
+        map.set(row[index1], { ...map.get(row[index1]), ...arrayToObj(header1, row) });
     });
     rows2.forEach(row => {
-        map.set(row[index2], {...map.get(row[index2]), ...arrayToObj(header2, row)});
+        map.set(row[index2], { ...map.get(row[index2]), ...arrayToObj(header2, row) });
     });
 
     // マージしたデータを出力形式に変換
@@ -75,33 +75,61 @@ function processCSV(csv1, csv2) {
     return output.join('\n');
 }
 
-        // フィルタリング処理
-        function handleFile() {
-            const fileInput = document.getElementById('csvFile1');
-            const file = fileInput.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const text = event.target.result;
-                    const lines = text.split('\n').map(line => line.split(','));
-                    const headerIndex = lines[0].indexOf('賦課');
-                    if (headerIndex === -1) {
-                        alert('賦課列が見つかりません。');
-                        return;
-                    }
-
-                    const filteredLines = lines.filter((line, index) => {
-                        return index === 0 || line[headerIndex] !== '課税対象';
-                    });
-
-                    const output = filteredLines.map(line => line.join(',')).join('\n');
-                    downloadCSV(output, 'filtered.csv');
-                };
-                reader.readAsText(file);
-            } else {
-                alert('ファイルを選択してください。');
+// 課税対象の住民を除外する処理
+function handleFile() {
+    const fileInput = document.getElementById('csvFile1');
+    const file = fileInput.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const text = event.target.result;
+            const lines = text.split('\n').map(line => line.split(','));
+            const headerIndex = lines[0].indexOf('賦課');
+            if (headerIndex === -1) {
+                alert('賦課列が見つかりません。');
+                return;
             }
-        }
+
+            const filteredLines = lines.filter((line, index) => {
+                return index === 0 || line[headerIndex] !== '課税対象';
+            });
+
+            const output = filteredLines.map(line => line.join(',')).join('\n');
+            downloadCSV(output, 'filtered.csv');
+        };
+        reader.readAsText(file);
+    } else {
+        alert('ファイルを選択してください。');
+    }
+}
+
+// 単身世帯の世帯主が死亡している住民を除外する処理
+/*function handleFile() {
+    const fileInput = document.getElementById('csvFile1');
+    const file = fileInput.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const text = event.target.result;
+            const lines = text.split('\n').map(line => line.split(','));
+            const headerIndex = lines[0].indexOf('賦課');
+            if (headerIndex === -1) {
+                alert('賦課列が見つかりません。');
+                return;
+            }
+
+            const filteredLines = lines.filter((line, index) => {
+                return index === 0 || line[headerIndex] !== '課税対象';
+            });
+
+            const output = filteredLines.map(line => line.join(',')).join('\n');
+            downloadCSV(output, 'filtered.csv');
+        };
+        reader.readAsText(file);
+    } else {
+        alert('ファイルを選択してください。');
+    }
+}*/
 
 // CSVファイルをダウンロード
 function downloadCSV(csvContent, filename) {
