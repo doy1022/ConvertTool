@@ -14,56 +14,52 @@ function mergeCSV() {
         const csv1 = e1.target.result;
         reader2.onload = function(e2) {
             const csv2 = e2.target.result;
-            const mergedCSV = processCSV(csv1, csv2);
-            downloadCSV(mergedCSV, 'merged.csv');
+            try {
+                const mergedCSV = processCSV(csv1, csv2);
+                downloadCSV(mergedCSV, 'merged.csv');
+            } catch (error) {
+                alert(error.message);
+            }
         };
         reader2.readAsText(file2);
     };
     reader1.readAsText(file1);
 }
 
+function parseCSV(csv) {
+    return csv.trim().split('\n').map(line => line.split(','));
+}
+
+function csvToObject(csv) {
+    const [header, ...data] = parseCSV(csv);
+    const commonIndex = header.indexOf('宛名番号');
+    if (commonIndex === -1) {
+        throw new Error('「宛名番号」カラムが見つかりません。');
+    }
+    const map = new Map(data.map(row => [row[commonIndex], row]));
+    return { header, map };
+}
+
 function processCSV(csv1, csv2) {
-    const parseCSV = (csv) => {
-        return csv.trim().split('\n').map(line => line.split(','));
-    };
-
-    const csvToObject = (csv) => {
-        const [header, ...data] = parseCSV(csv);
-        const commonIndex = header.indexOf('宛名番号');
-        if (commonIndex === -1) {
-            throw new Error('「宛名番号」カラムが見つかりません。');
-        }
-        const map = new Map(data.map(row => [row[commonIndex], row]));
-        return { header, map };
-    };
-
     const { header: header1, map: map1 } = csvToObject(csv1);
     const { header: header2, map: map2 } = csvToObject(csv2);
 
     const mergedHeader = Array.from(new Set([...header1, ...header2]));
     const mergedData = [];
 
-    // 合わせる共通のキーを抽出してマージ
     map1.forEach((row1, key) => {
         if (map2.has(key)) {
             const row2 = map2.get(key);
             const mergedRow = mergedHeader.map(col => {
                 const index1 = header1.indexOf(col);
                 const index2 = header2.indexOf(col);
-                if (index1 !== -1 && row1.length > index1) {
-                    return row1[index1];
-                } else if (index2 !== -1 && row2.length > index2) {
-                    return row2[index2];
-                } else {
-                    return '';
-                }
+                return index1 !== -1 ? row1[index1] : row2[index2];
             });
             mergedData.push(mergedRow);
         }
     });
 
-    const mergedCSV = [mergedHeader, ...mergedData].map(row => row.join(',')).join('\n');
-    return mergedCSV;
+    return [mergedHeader, ...mergedData].map(row => row.join(',')).join('\n');
 }
 
 function downloadCSV(csvContent, filename) {
