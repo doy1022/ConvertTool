@@ -75,6 +75,35 @@ function processCSV(csv1, csv2) {
     return output.join('\n');
 }
 
+        // フィルタリング処理
+        function handleFile() {
+            const fileInput = document.getElementById('csvFile1');
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const text = event.target.result;
+                    const lines = text.split('\n').map(line => line.split(','));
+                    const headerIndex = lines[0].indexOf('賦課');
+                    if (headerIndex === -1) {
+                        alert('賦課列が見つかりません。');
+                        return;
+                    }
+
+                    const filteredLines = lines.filter((line, index) => {
+                        return index === 0 || line[headerIndex] !== '課税対象';
+                    });
+
+                    const output = filteredLines.map(line => line.join(',')).join('\n');
+                    downloadCSV(output, 'filtered.csv');
+                };
+                reader.readAsText(file);
+            } else {
+                alert('ファイルを選択してください。');
+            }
+        }
+
+
 // CSVファイルのダウンロード
 function downloadCSV(csvContent, filename) {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
