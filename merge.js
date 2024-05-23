@@ -104,8 +104,8 @@ function handleFile() {
 }
 
 // 世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている行を除外する処理
-function filterSingleHouseholds() {
-    const fileInput = document.getElementById('csvFile');
+function filterDeath() {
+    const fileInput = document.getElementById('csvFile2');
     const file = fileInput.files[0];
     if (file) {
         const reader = new FileReader();
