@@ -104,8 +104,8 @@ function handleFile() {
 }
 
 // 単身世帯の世帯主が死亡している住民を除外する処理
-/*function handleFile() {
-    const fileInput = document.getElementById('csvFile1');
+function filterDeath() {
+    const fileInput = document.getElementById('csvFile2');
     const file = fileInput.files[0];
     if (file) {
         const reader = new FileReader();
@@ -129,7 +129,7 @@ function handleFile() {
     } else {
         alert('ファイルを選択してください。');
     }
-}*/
+}
 
 // CSVファイルをダウンロード
 function downloadCSV(csvContent, filename) {
