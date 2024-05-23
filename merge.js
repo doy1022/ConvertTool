@@ -44,20 +44,32 @@ function processCSV(csv1, csv2) {
     const { header: header1, map: map1 } = csvToObject(csv1);
     const { header: header2, map: map2 } = csvToObject(csv2);
 
-    // 共通ヘッダーを作成
-    const mergedHeader = Array.from(new Set([...header1, ...header2].sort((a, b) => a.localeCompare(b))));
+    // 共通ヘッダーの決定
+    const mergedHeader = Array.from(new Set([...header1, ...header2]));
+
+    // データのマージ
     const mergedData = [];
 
     map1.forEach((row1, key) => {
         if (map2.has(key)) {
             const row2 = map2.get(key);
-            const mergedRow = mergedHeader.map(header => {
-                const index1 = header1.indexOf(header);
-                const index2 = header2.indexOf(header);
-                // headerがheader1とheader2のどちらにも存在すればそのデータを使用
-                return (index1 !== -1 ? row1[index1] : '') || (index2 !== -1 ? row2[index2] : '');
+            const mergedRow = {};
+
+            // header1からデータを取得
+            header1.forEach((h, i) => {
+                mergedRow[h] = row1[i];
             });
-            mergedData.push(mergedRow.join(','));
+
+            // header2からデータを取得し、マージ
+            header2.forEach((h, i) => {
+                if (mergedRow[h] === undefined) {
+                    mergedRow[h] = row2[i];
+                }
+            });
+
+            // 最終的な行を作成
+            const finalRow = mergedHeader.map(h => mergedRow[h] || '');
+            mergedData.push(finalRow.join(','));
         }
     });
 
