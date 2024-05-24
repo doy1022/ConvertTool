@@ -134,9 +134,9 @@ function filterDeath() {
 
                 // 条件：世帯員の人数が1ではない、または、任意の消除関連フィールドが空である
                 return !(line[membersIndex] === '1' &&
-                         line[removalDateIndex].trim() !== '' &&
-                         line[notificationDateIndex].trim() !== '' &&
-                         line[reasonCodeIndex].trim() !== '');
+                    line[removalDateIndex].trim() !== '' &&
+                    line[notificationDateIndex].trim() !== '' &&
+                    line[reasonCodeIndex].trim() !== '');
             });
 
             const output = filteredLines.map(line => line.join(',')).join('\n');
@@ -147,6 +147,52 @@ function filterDeath() {
         alert('ファイルを選択してください。');
     }
 }
+
+function deleteRowsByAddressNumber() {
+    const file1 = document.getElementById('file3').files[0];
+    const file2 = document.getElementById('file4').files[0];
+    if (!file1 || !file2) {
+        alert('両方のファイルを選択してください。');
+        return;
+    }
+
+    const reader1 = new FileReader();
+    const reader2 = new FileReader();
+
+    reader1.onload = function (e) {
+        const text1 = e.target.result;
+        reader2.onload = function (e) {
+            const text2 = e.target.result;
+            const output = deleteRows(text1, text2);
+            downloadCSV(output, 'deleted_rows.csv');
+        };
+        reader2.readAsText(file2);
+    };
+    reader1.readAsText(file1);
+}
+
+function deleteRows(csvText1, csvText2) {
+    const lines1 = csvText1.split('\n').map(line => line.split(','));
+    const lines2 = csvText2.split('\n').map(line => line.split(','));
+
+    const headers1 = lines1[0];
+    const headers2 = lines2[0];
+    const index1 = headers1.indexOf('宛名番号');
+    const index2 = headers2.indexOf('宛名番号');
+
+    if (index1 === -1 || index2 === -1) {
+        alert('宛名番号列が見つかりません。');
+        return;
+    }
+
+    const addressNumbers = new Set(lines2.slice(1).map(line => line[index2].trim()));
+    const filteredLines = lines1.filter((line, index) => {
+        return index === 0 || !addressNumbers.has(line[index1].trim());
+    });
+
+    return filteredLines.map(line => line.join(',')).join('\n');
+}
+
 
 // CSVファイルをダウンロード
 function downloadCSV(csvContent, filename) {
