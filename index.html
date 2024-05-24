@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="ja">
-    
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSVファイルマージツール</title>
 </head>
+
 <body>
     <h1>1.住基情報と税情報を、宛名番号をキーにしてマージする</h1>
     <form id="csvForm">
@@ -17,12 +18,13 @@
     </form>
     <script src="merge.js"></script>
 </body>
-    
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSVファイルフィルタリングツール</title>
 </head>
+
 <body>
     <h1>2.課税対象の住民を除外する</h1>
     <form id="csvForm">
@@ -32,12 +34,13 @@
     </form>
     <script src="merge.js"></script>
 </body>
-    
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSVファイルフィルタリングツール2</title>
 </head>
+
 <body>
     <h1>3.死亡している住民を除外する</h1>
     <form id="csvForm">
@@ -47,5 +50,22 @@
     </form>
     <script src="merge.js"></script>
 </body>
-    
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSVファイルフィルタリングツール3</title>
+</head>
+
+<body>
+    <h1>4.R5給付対象者を宛名番号をキーとして除外する</h1>
+    <form id="csvForm">
+        <label for="file3">住基情報＋税情報-課税対象-死亡者の住民ファイルをアップロードして下さい</label>
+        <input type="file" id="file3" accept=".csv"><br><br>
+        <label for="file4">R5給付対象者ファイルをアップロードして下さい:</label>
+        <input type="file" id="file4" accept=".csv"><br><br>
+        <button type="button" onclick="deleteRowsByAddressNumber()">R5給付対象者を除外したファイルをダウンロードする</button>
+    </form>
+    <script src="merge.js"></script>
+
 </html>
