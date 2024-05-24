@@ -27,36 +27,15 @@ function mergeCSV() {
     reader1.readAsText(file1);
 }
 
-// CSVファイルの解析
-function parseCSV(csv) {
-    const lines = csv.split('\n').map(line => line.trim()).filter(line => line);
-    const header = lines[0].split(',');
-    const rows = lines.slice(1).map(line => line.split(','));
-    return { header, rows };
-}
-
-// 配列をオブジェクトに変換
-function arrayToObj(headers, row) {
-    const obj = {};
-    headers.forEach((header, i) => {
-        obj[header] = row[i];
-    });
-    return obj;
-}
-
-// CSVファイルのマージ処理
 function processCSV(csv1, csv2) {
     const { header: header1, rows: rows1 } = parseCSV(csv1);
     const { header: header2, rows: rows2 } = parseCSV(csv2);
 
-    // 両ファイルのヘッダーをマージして重複を排除
     const fullHeader = Array.from(new Set([...header1, ...header2]));
 
-    // 重複カラム「宛名番号」のインデックスを見つける
     const index1 = header1.indexOf('宛名番号');
     const index2 = header2.indexOf('宛名番号');
 
-    // マップを作成してデータを整理
     const map = new Map();
     rows1.forEach(row => {
         map.set(row[index1], { ...map.get(row[index1]), ...arrayToObj(header1, row) });
@@ -65,7 +44,6 @@ function processCSV(csv1, csv2) {
         map.set(row[index2], { ...map.get(row[index2]), ...arrayToObj(header2, row) });
     });
 
-    // マージしたデータを出力形式に変換
     const output = [fullHeader.join(',')];
     map.forEach((value, key) => {
         const row = fullHeader.map(header => value[header] || '');
@@ -73,6 +51,21 @@ function processCSV(csv1, csv2) {
     });
 
     return output.join('\n');
+}
+
+function parseCSV(csv) {
+    const lines = csv.split('\n').map(line => line.trim()).filter(line => line);
+    const header = lines[0].split(',');
+    const rows = lines.slice(1).map(line => line.split(','));
+    return { header, rows };
+}
+
+function arrayToObj(headers, row) {
+    const obj = {};
+    headers.forEach((header, i) => {
+        obj[header] = row[i];
+    });
+    return obj;
 }
 
 // 課税対象の住民を除外する処理
@@ -104,7 +97,6 @@ function handleFile() {
 }
 
 // 世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている行を除外する処理
-// 「世帯員の人数が1」の判定に関して、おそらく「住基情報内「ＦＯ－世帯番号」が同じである」という条件に回収する必要がある
 function filterDeath() {
     const fileInput = document.getElementById('csvFile2');
     const file = fileInput.files[0];
@@ -114,25 +106,19 @@ function filterDeath() {
             const text = event.target.result;
             const lines = text.split('\n').map(line => line.split(','));
 
-            // ヘッダー行から必要な列のインデックスを取得
             const headers = lines[0];
             const membersIndex = headers.indexOf('世帯員の人数');
             const removalDateIndex = headers.indexOf('消除日');
             const notificationDateIndex = headers.indexOf('消除届出日');
             const reasonCodeIndex = headers.indexOf('消除事由コード');
 
-            // これらの項目が見つからない場合のエラーハンドリング
             if (membersIndex === -1 || removalDateIndex === -1 || notificationDateIndex === -1 || reasonCodeIndex === -1) {
-                alert('必要なヘッダーがいずれか見つかりません。');
+                alert('必要なヘッダーが見つかりません。');
                 return;
             }
 
-            // 条件にマッチしない行をフィルタリング
             const filteredLines = lines.filter((line, index) => {
-                // ヘッダー行は常に含める
                 if (index === 0) return true;
-
-                // 条件：世帯員の人数が1ではない、または、任意の消除関連フィールドが空である
                 return !(line[membersIndex] === '1' &&
                     line[removalDateIndex].trim() !== '' &&
                     line[notificationDateIndex].trim() !== '' &&
@@ -148,6 +134,7 @@ function filterDeath() {
     }
 }
 
+// R5給付対象者を除外する処理
 function deleteRowsByAddressNumber() {
     const file1 = document.getElementById('file3').files[0];
     const file2 = document.getElementById('file4').files[0];
@@ -193,6 +180,56 @@ function deleteRows(csvText1, csvText2) {
     return filteredLines.map(line => line.join(',')).join('\n');
 }
 
+// 廃止理由が18の行を除外する処理
+function filterAbolishmentReason() {
+    const file1 = document.getElementById('file5').files[0];
+    const file2 = document.getElementById('file6').files[0];
+
+    if (!file1 || !file2) {
+        alert('両方のファイルを選択してください。');
+        return;
+    }
+
+    const reader1 = new FileReader();
+    const reader2 = new FileReader();
+
+    reader1.onload = function (e) {
+        const text1 = e.target.result;
+        reader2.onload = function (e) {
+            const text2 = e.target.result;
+            const output = filterRowsByReason(text1, text2);
+            downloadCSV(output, 'filtered_abolishment.csv');
+        };
+        reader2.readAsText(file2);
+    };
+    reader1.readAsText(file1);
+}
+
+function filterRowsByReason(csvText1, csvText2) {
+    const lines1 = csvText1.split('\n').map(line => line.split(','));
+    const lines2 = csvText2.split('\n').map(line => line.split(','));
+
+    const headers1 = lines1[0];
+    const headers2 = lines2[0];
+    const index1 = headers1.indexOf('宛名番号');
+    const index2 = headers2.indexOf('宛名番号');
+    const reasonIndex = headers2.indexOf('廃止理由');
+
+    if (index1 === -1 || index2 === -1 || reasonIndex === -1) {
+        alert('宛名番号列または廃止理由列が見つかりません。');
+        return;
+    }
+
+    const abolishmentNumbers = new Set(
+        lines2.slice(1).filter(line => line[reasonIndex].trim() === '18').map(line => line[index2].trim())
+    );
+
+    const filteredLines = lines1.filter((line, index) => {
+        return index === 0 || !abolishmentNumbers.has(line[index1].trim());
+    });
+
+    return filteredLines.map(line => line.join(',')).join('\n');
+}
 
 // CSVファイルをダウンロード
 function downloadCSV(csvContent, filename) {
