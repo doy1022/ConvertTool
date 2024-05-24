@@ -1,3 +1,4 @@
+
 // CSVファイルのマージ
 function mergeCSV() {
     const file1 = document.getElementById('file1').files[0];
@@ -27,6 +28,7 @@ function mergeCSV() {
     reader1.readAsText(file1);
 }
 
+// マージ処理で使用するfunction。
 function processCSV(csv1, csv2) {
     const { header: header1, rows: rows1 } = parseCSV(csv1);
     const { header: header2, rows: rows2 } = parseCSV(csv2);
