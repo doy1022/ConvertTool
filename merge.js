@@ -494,5 +494,8 @@ function downloadCSV(content, filename) {
     link.click();
     document.body.removeChild(link);
 }
+<<<<<<< HEAD
 
 /* 使いまわすメソッド（汎用処理）ここまで */
+=======
+>>>>>>> 23abc586f7ef1add7af3ea9d80a1fd3e3c18d28d
