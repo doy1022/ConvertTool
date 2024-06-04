@@ -90,16 +90,16 @@
         <button type="button" onclick="generateNaturalizedCitizenFile()">帰化対象者リストをダウンロードする</button>
     </form>
 
-    <!--ここから作成前。とりあえず置いてみただけ。あとはfunctionを書けば終わり（Javascript側を一切書いてない）-->
     <h1>11.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルをマージする</h1>
     <form id="csvForm11">
         <label for="file15">中間ファイル⑤をアップロードしてください:</label>
         <input type="file" id="file15" accept=".csv"><br><br>
         <label for="file16">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
         <input type="file" id="file16" accept=".csv"><br><br>
-        <button type="button" onclick="">中間ファイル⑧をダウンロードする</button>
+        <button type="button" onclick="updateFukaByAtenaNumber()">中間ファイル⑧をダウンロードする</button>
     </form>
 
+    <!--ここから作成前。とりあえず置いてみただけ。あとはfunctionを書けば終わり（Javascript側を一切書いてない）-->
     <h1>12.税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする</h1>
     <form id="csvForm12">
         <label for="file17">中間ファイル⑧をアップロードしてください:</label>
