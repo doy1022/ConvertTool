@@ -88,9 +88,17 @@ function removeFIFromHeader(header) {
 
 function parseCSV(csv) {
     // split()メソッドを使用して、CSVファイルの行を'\n'（改行）単位で分解する→1行ずつに分かれる
-    const [header, ...rows] = csv.split('\n').map(line => line.trim()).filter(line => line);
-    // split()メソッドを使用して、CSVファイルヘッダー・各行を','単位で分解し、objectとして返す
-    return { header: header.split(','), rows: rows.map(row => row.split(',')) };
+    const [header, ...rows] = csv
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line)
+        .map(line => {
+            return line.split(',').map(field => {
+                return field.replace(/^"|"$/g, '').trim();
+            });
+        });
+    // CSVファイルをヘッダー・各行で分けてobjectとして返す
+    return { header: header, rows: rows.map(row => row) };
 }
 
 function arrayToObj(headers, row) {
@@ -442,10 +450,10 @@ function updateFukaByAtenaNumber() {
 }
 
 function updateheaderless(csvText1, csvText2) {
-    var lines1 = csvText1.split('\n').map(function(line) {
+    var lines1 = csvText1.split('\n').map(function (line) {
         return line.split(',');
     });
-    var lines2 = csvText2.split('\n').map(function(line) {
+    var lines2 = csvText2.split('\n').map(function (line) {
         return line.split(',');
     });
     // ヘッダー行を取得
@@ -459,7 +467,7 @@ function updateheaderless(csvText1, csvText2) {
 
     // 宛名番号をキーに課税額をマップにする
     var kazeiMap = {};
-    lines2.forEach(function(line) {
+    lines2.forEach(function (line) {
         kazeiMap[line[atenaIndex2].trim()] = line[kazeiIndex2].trim();
     });
 
@@ -473,7 +481,7 @@ function updateheaderless(csvText1, csvText2) {
     }
 
     // 更新されたCSVを文字列に戻す
-    return lines1.map(function(line) {
+    return lines1.map(function (line) {
         return line.join(',');
     }).join('\n');
 }
@@ -482,7 +490,7 @@ function updateheaderless(csvText1, csvText2) {
 // 2つのファイルをマージし、税区分コードを追加する関数
 function mergeAndAddTaxCodeAndUpdate() {
     // ファイル1とファイル2のIDを指定して、マージと税区分コードの追加を行う
-    processTwoFiles('file14', 'file15', function(file1Text, file2Text) {
+    processTwoFiles('file14', 'file15', function (file1Text, file2Text) {
         // ファイル1のテキストを行ごとに分割し、各行をカンマで区切る
         const lines1 = file1Text.split('\n').map(line => line.split(','));
         // ファイル2のテキストを行ごとに分割し、各行をカンマで区切る
@@ -532,7 +540,7 @@ function mergeAndAddTaxCodeAndUpdate() {
 
         // 更新されたCSVを文字列に戻す
         const mergedFileText = updatedFile1Text.join('\n') + '\n' + updatedFile2Text.join('\n');
-        
+
         return mergedFileText;
     }, 'マージ後ファイル.csv');
 }
@@ -675,18 +683,18 @@ class Logger {
 
     log(level, message) {
         if (this.levels.indexOf(level) >= this.levels.indexOf(this.level)) {
-          const timestamp = this.getCurrentTime();
-          const logMessage = `[${timestamp}] [${level.toUpperCase()}] \n ${message}`;
-          this.appendLog(logMessage, level);
+            const timestamp = this.getCurrentTime();
+            const logMessage = `[${timestamp}] [${level.toUpperCase()}] \n ${message}`;
+            this.appendLog(logMessage, level);
         }
-      }
-    
-      appendLog(message, level) {
+    }
+
+    appendLog(message, level) {
         const logEntry = document.createElement('div');
         logEntry.textContent = message;
         logEntry.classList.add(`log-${level}`);
         this.logContainer.prepend(logEntry);
-      }
+    }
 
     debug(message) {
         this.log('debug', message);
