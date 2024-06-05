@@ -465,6 +465,114 @@ function updateheaderless(csvText1, csvText2) {
     return lines1.map(line => line.join(',')).join('\n');
 }
 
+/* 12. 帰化対象者と中間ファイル⑤から税区分コードを抽出しCSVファイルを生成する処理 */
+function excludeAndAddTaxCategory() {
+	processTwoFiles('file1', 'file2', processTaxCategory, 'output.csv');
+}
+
+function processTaxCategory(text1, text2) {
+	const lines1 = text1.split('\n').map(line => line.split(','));
+	const lines2 = text2.split('\n').map(line => line.split(','));
+	const headers1 = lines1[0];
+	const headers2 = lines2[0];
+	const abolitionReasonIndex = headers1.indexOf('廃止理由');
+	const taxCategoryIndex = headers1.indexOf('税区分');
+	if (abolitionReasonIndex === -1 || taxCategoryIndex === -1) {
+		alert('必要な列が見つかりません。');
+		return;
+	}
+	const filteredLines1 = lines1.filter((line, index) => index === 0 || line[abolitionReasonIndex] !== '18(他区課税)');
+	const updatedLines1 = filteredLines1.map((line, index) => {
+		if (index === 0) {
+			return [...line, '税区分コード'];
+		}
+		const taxCategory = line[taxCategoryIndex];
+		let taxCategoryCode;
+		switch (taxCategory) {
+			case '課税':
+				taxCategoryCode = '0';
+				break;
+			case '非課税':
+				taxCategoryCode = '1';
+				break;
+			case '均等割りのみ課税':
+				taxCategoryCode = '2';
+				break;
+			default:
+				taxCategoryCode = '';
+		}
+		return [...line, taxCategoryCode];
+	});
+
+	const combinedLines = updatedLines1.map((line, index) => {
+		if (index === 0) {
+			return line.concat(headers2.filter(header => header !== '税区分'));
+		} else {
+			const matchingLine = lines2.find(l => l[0] === line[0]); // Assuming first column is some kind of identifier
+			if (matchingLine) {
+				return line.concat(matchingLine.slice(1));
+			} else {
+				return line.concat(new Array(headers2.length - 1).fill('')); // If no match found, fill with empty values
+			}
+		}
+	});
+
+	return combinedLines.map(line => line.join(',')).join('\n');
+}
+
+function processTwoFiles(fileId1, fileId2, processFunc, outputFilename) {
+	const file1 = document.getElementById(fileId1).files[0];
+	const file2 = document.getElementById(fileId2).files[0];
+	if (!file1 || !file2) {
+		alert("2つのCSVファイルをアップロードしてください。");
+		return;
+	}
+	const reader1 = new FileReader();
+	const reader2 = new FileReader();
+	let text1, text2;
+
+	reader1.onload = function (e) {
+		text1 = e.target.result;
+		if (text2) {
+			const processedText = processFunc(text1, text2);
+			if (processedText) {
+				downloadCSV(processedText, outputFilename);
+			}
+		}
+	};
+
+	reader2.onload = function (e) {
+		text2 = e.target.result;
+		if (text1) {
+			const processedText = processFunc(text1, text2);
+			if (processedText) {
+				downloadCSV(processedText, outputFilename);
+			}
+		}
+	};
+
+	reader1.readAsText(file1);
+	reader2.readAsText(file2);
+}
+
+function downloadCSV(csv, filename) {
+	const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+	if (navigator.msSaveBlob) { // IE 10+
+		navigator.msSaveBlob(blob, filename);
+	} else {
+		const link = document.createElement('a');
+		if (link.download !== undefined) {
+			const url = URL.createObjectURL(blob);
+			link.setAttribute('href', url);
+			link.setAttribute('download', filename);
+			link.style.visibility = 'hidden';
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		}
+	}
+}
+
 
 /* 以下、使いまわすメソッド（汎用処理）ここから */
 /* 単一ファイル処理の汎用関数 */
