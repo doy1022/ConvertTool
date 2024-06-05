@@ -1,5 +1,14 @@
+/* 定数定義 */
+const LOG_LEVEL = 'debug';
+
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
+
+    logger.debug('デバッグログサンプル');
+    logger.info('情報ログサンプル');
+    logger.warn('警告ログサンプル');
+    logger.error('エラーログサンプル');
+
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file1', 'file2', 'file3', 'file4'];
     // document.getElementById()メソッド：HTMLのIDタグにマッチするドキュメントを取得する
@@ -644,3 +653,56 @@ function downloadCSV(content, filename) {
 }
 
 /* 使いまわすメソッド（汎用処理）ここまで */
+
+class Logger {
+    constructor(level = 'info', logContainerId = 'log-box') {
+        this.levels = ['debug', 'info', 'warn', 'error'];
+        this.level = level;
+        this.logContainer = document.getElementById(logContainerId);
+    }
+
+    getCurrentTime() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+
+    log(level, message) {
+        if (this.levels.indexOf(level) >= this.levels.indexOf(this.level)) {
+          const timestamp = this.getCurrentTime();
+          const logMessage = `[${timestamp}] [${level.toUpperCase()}] \n ${message}`;
+          this.appendLog(logMessage, level);
+        }
+      }
+    
+      appendLog(message, level) {
+        const logEntry = document.createElement('div');
+        logEntry.textContent = message;
+        logEntry.classList.add(`log-${level}`);
+        this.logContainer.prepend(logEntry);
+      }
+
+    debug(message) {
+        this.log('debug', message);
+    }
+
+    info(message) {
+        this.log('info', message);
+    }
+
+    warn(message) {
+        this.log('warn', message);
+    }
+
+    error(message) {
+        this.log('error', message);
+    }
+}
+// ログ出力クラスのインスタンス化
+var logger = new Logger(LOG_LEVEL); // 引数以上のレベルのログのみを出力します（infoの場合、debugログは出力されない）
