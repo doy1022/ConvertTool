@@ -106,8 +106,79 @@
         <input type="file" id="file17" accept=".csv"><br><br>
         <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
         <input type="file" id="file18" accept=".csv"><br><br>
-        <button type="button" onclick="">中間ファイル⑨を作成する</button>
+        <button type="button" onclick="mergeFiles()">中間ファイル⑨を作成する</button>
     </form>
+
+    <script>
+        function mergeFiles() {
+            const file17 = document.getElementById('file17').files[0];
+            const file18 = document.getElementById('file18').files[0];
+
+            if (!file17 || !file18) {
+                alert('両方のファイルをアップロードしてください。');
+                return;
+            }
+
+            const reader17 = new FileReader();
+            const reader18 = new FileReader();
+
+            reader17.onload = function(e) {
+                const text17 = e.target.result;
+                reader18.readAsText(file18);
+            };
+
+            reader18.onload = function(e) {
+                const text18 = e.target.result;
+                const finalCsv = mergeCsvFiles(text17, text18);
+                saveToFile(finalCsv, '中間ファイル⑨.csv');
+            };
+
+            reader17.readAsText(file17);
+        }
+
+        function mergeCsvFiles(naturalizedCsvText, taxCsvText) {
+            var naturalizedLines = naturalizedCsvText.split('\n').map(line => line.split(','));
+            var taxLines = taxCsvText.split('\n').map(line => line.split(','));
+
+            var taxHeader = taxLines[0];
+            var taxData = taxLines.slice(1);
+
+            var atenaIndex = taxHeader.indexOf('宛名番号');
+            var fukaIndex = taxHeader.indexOf('課税区分');
+
+            var taxMap = {};
+            taxData.forEach(line => {
+                taxMap[line[atenaIndex].trim()] = line[fukaIndex].trim();
+            });
+
+            var finalHeader = [...naturalizedLines[0], '税区分コード'];
+            var finalData = naturalizedLines.slice(1).map(line => {
+                var atenaNumber = line[0].trim();
+                var taxStatus = taxMap[atenaNumber] || '';
+                var taxCode = taxStatus === '課税' ? 0 : taxStatus === '非課税' ? 1 : taxStatus === '均等割りのみ課税' ? 2 : '';
+                return [...line, taxCode];
+            });
+
+            var finalCsv = [finalHeader, ...finalData].map(line => line.join(',')).join('\n');
+            return finalCsv;
+        }
+
+        function saveToFile(content, fileName) {
+            var blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement('a');
+            if (link.download !== undefined) {
+                var url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    </script>
+</body>
+</html>
 
     <h1>13.課税対象の住民を除外する</h1>
     <form id="csvForm13">
