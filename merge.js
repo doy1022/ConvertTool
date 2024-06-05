@@ -11,6 +11,7 @@ function mergeCSV() {
     }
 
     //aaaa
+    //bbbb
 
     // FileReaderオブジェクトを生成し、各ファイルの読み込みを行う（map処理内にFileReaderの生成を含む）
     const readers = files.map(file => new FileReader());
