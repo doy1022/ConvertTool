@@ -432,7 +432,6 @@ function updateFukaByAtenaNumber() {
     processTwoFiles('file15', 'file16', updateheaderless, '中間ファイル⑧.csv');
 }
 
-/* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
 function updateheaderless(csvText1, csvText2) {
     var lines1 = csvText1.split('\n').map(function(line) {
         return line.split(',');
@@ -470,6 +469,8 @@ function updateheaderless(csvText1, csvText2) {
     }).join('\n');
 }
 
+
+/* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
 function generateNaturalizedCitizenFile(callback) {
     processSingleFile('file14', function (text) {
         const lines = text.split('\n').map(line => line.split(','));
