@@ -466,111 +466,106 @@ function updateheaderless(csvText1, csvText2) {
 }
 
 /* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
-function excludeAndAddTaxCategory() {
-	processTwoFiles('file1', 'file2', processTaxCategory, 'output.csv');
+// 2つのファイルをマージし、税区分コードを追加する関数
+function mergeAndAddTaxCodeAndUpdate() {
+    // ファイル1とファイル2のIDを指定して、マージと税区分コードの追加を行う
+    processTwoFiles('file14', 'file15', function(file1Text, file2Text) {
+        // ファイル1のテキストを行ごとに分割し、各行をカンマで区切る
+        const lines1 = file1Text.split('\n').map(line => line.split(','));
+        // ファイル2のテキストを行ごとに分割し、各行をカンマで区切る
+        const lines2 = file2Text.split('\n').map(line => line.split(','));
+
+        // ヘッダー行を取得
+        const headers1 = lines1[0];
+        const headers2 = lines2[0];
+
+        // 「税区分コード」列の追加
+        headers1.push('税区分コード');
+
+        // 新しいヘッダーを使用してCSVファイルのテキストを更新
+        const updatedFile1Text = [headers1.join(',')];
+        const updatedFile2Text = [headers2.join(',')];
+
+        // 宛名番号と課税額のインデックスを取得
+        const atenaIndex1 = headers1.indexOf('宛名番号');
+        const kazeiIndex2 = headers2.indexOf('課税額');
+
+        // 宛名番号をキーにして課税額をマップにする
+        const kazeiMap = new Map(lines2.map(line => [line[0].trim(), line[kazeiIndex2].trim()]));
+
+        // ファイル1の各行に税区分コードを追加して更新
+        for (let i = 1; i < lines1.length; i++) {
+            const atenaNumber = lines1[i][atenaIndex1].trim();
+            let taxCode = ''; // デフォルトは空白
+            if (kazeiMap.has(atenaNumber)) {
+                const kazeiValue = kazeiMap.get(atenaNumber);
+                if (kazeiValue === '0') {
+                    taxCode = '0'; // 課税の場合
+                } else if (kazeiValue === '') {
+                    taxCode = '1'; // 非課税の場合
+                } else {
+                    taxCode = '2'; // 均等割りのみ課税の場合
+                }
+            }
+            // 税区分コードを追加
+            lines1[i].push(taxCode);
+            updatedFile1Text.push(lines1[i].join(','));
+        }
+
+        // ファイル2の内容をそのまま追加
+        for (let i = 1; i < lines2.length; i++) {
+            updatedFile2Text.push(lines2[i].join(','));
+        }
+
+        // 更新されたCSVを文字列に戻す
+        const mergedFileText = updatedFile1Text.join('\n') + '\n' + updatedFile2Text.join('\n');
+        
+        return mergedFileText;
+    }, 'マージ後ファイル.csv');
 }
 
-function processTaxCategory(text1, text2) {
-	const lines1 = text1.split('\n').map(line => line.split(','));
-	const lines2 = text2.split('\n').map(line => line.split(','));
-	const headers1 = lines1[0];
-	const headers2 = lines2[0];
-	const abolitionReasonIndex = headers1.indexOf('廃止理由');
-	const taxCategoryIndex = headers1.indexOf('税区分');
-	if (abolitionReasonIndex === -1 || taxCategoryIndex === -1) {
-		alert('必要な列が見つかりません。');
-		return;
-	}
-	const filteredLines1 = lines1.filter((line, index) => index === 0 || line[abolitionReasonIndex] !== '18(他区課税)');
-	const updatedLines1 = filteredLines1.map((line, index) => {
-		if (index === 0) {
-			return [...line, '税区分コード'];
-		}
-		const taxCategory = line[taxCategoryIndex];
-		let taxCategoryCode;
-		switch (taxCategory) {
-			case '課税':
-				taxCategoryCode = '0';
-				break;
-			case '非課税':
-				taxCategoryCode = '1';
-				break;
-			case '均等割りのみ課税':
-				taxCategoryCode = '2';
-				break;
-			default:
-				taxCategoryCode = '';
-		}
-		return [...line, taxCategoryCode];
-	});
+// 2つのCSVファイルのテキストをマージする関数
+function mergeTwoFiles(fileId1, fileId2, processFunc, outputFilename) {
+    const file1 = document.getElementById(fileId1).files[0];
+    const file2 = document.getElementById(fileId2).files[0];
 
-	const combinedLines = updatedLines1.map((line, index) => {
-		if (index === 0) {
-			return line.concat(headers2.filter(header => header !== '税区分'));
-		} else {
-			const matchingLine = lines2.find(l => l[0] === line[0]); // Assuming first column is some kind of identifier
-			if (matchingLine) {
-				return line.concat(matchingLine.slice(1));
-			} else {
-				return line.concat(new Array(headers2.length - 1).fill('')); // If no match found, fill with empty values
-			}
-		}
-	});
+    if (!file1 || !file2) {
+        alert("2つのCSVファイルをアップロードしてください。");
+        return;
+    }
 
-	return combinedLines.map(line => line.join(',')).join('\n');
+    const reader1 = new FileReader();
+    const reader2 = new FileReader();
+
+    let text1, text2;
+
+    reader1.onload = function (e) {
+        text1 = e.target.result;
+        if (text2) {
+            const mergedText = processFunc(text1, text2);
+            if (mergedText) {
+                downloadCSV(mergedText, outputFilename);
+            }
+        }
+    };
+
+    reader2.onload = function (e) {
+        text2 = e.target.result;
+        if (text1) {
+            const mergedText = processFunc(text1, text2);
+            if (mergedText) {
+                downloadCSV(mergedText, outputFilename);
+            }
+        }
+    };
+
+    reader1.readAsText(file1);
+    reader2.readAsText(file2);
 }
 
-function processTwoFiles(fileId1, fileId2, processFunc, outputFilename) {
-	const file1 = document.getElementById(fileId1).files[0];
-	const file2 = document.getElementById(fileId2).files[0];
-	if (!file1 || !file2) {
-		alert("2つのCSVファイルをアップロードしてください。");
-		return;
-	}
-	const reader1 = new FileReader();
-	const reader2 = new FileReader();
-	let text1, text2;
-
-	reader1.onload = function (e) {
-		text1 = e.target.result;
-		if (text2) {
-			const processedText = processFunc(text1, text2);
-			if (processedText) {
-				downloadCSV(processedText, outputFilename);
-			}
-		}
-	};
-
-	reader2.onload = function (e) {
-		text2 = e.target.result;
-		if (text1) {
-			const processedText = processFunc(text1, text2);
-			if (processedText) {
-				downloadCSV(processedText, outputFilename);
-			}
-		}
-	};
-
-	reader1.readAsText(file1);
-	reader2.readAsText(file2);
-}
-
-function downloadCSV(csv, filename) {
-	const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-	if (navigator.msSaveBlob) { // IE 10+
-		navigator.msSaveBlob(blob, filename);
-	} else {
-		const link = document.createElement('a');
-		if (link.download !== undefined) {
-			const url = URL.createObjectURL(blob);
-			link.setAttribute('href', url);
-			link.setAttribute('download', filename);
-			link.style.visibility = 'hidden';
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
-		}
-	}
+// CSVファイルをダウンロードする関数
+function downloadCSV(csvText, filename) {
+    // ダウンロード処理
 }
 
 
