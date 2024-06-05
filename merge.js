@@ -2,7 +2,6 @@
 function mergeCSV() {
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file1', 'file2', 'file3', 'file4'];
-    // DOM（Document Object Model）からファイルを取得し配列に格納する。fileIdsがなくなるまで繰り返し処理
     // document.getElementById()メソッド：HTMLのIDタグにマッチするドキュメントを取得する
     const files = fileIds.map(id => document.getElementById(id).files[0]);
 
@@ -27,7 +26,7 @@ function mergeCSV() {
             // results配列内のデータがすべてそろったかを確認し、後続処理を行う（4はインプットファイル数）
             if (results.filter(result => result).length === 4) {
                 try {
-                    // processCSVfunctionを呼び出し、読み込んだファイル内データのマージをおこなう
+                    // 読み込んだファイル内データのマージをおこなう
                     const mergedCSV = processCSV(...results);
                     downloadCSV(mergedCSV, '中間ファイル①.csv');
                 } catch (error) {
@@ -35,25 +34,24 @@ function mergeCSV() {
                 }
             }
         };
-        // ファイルをテキストとして読み込む
         reader.readAsText(files[index]);
     });
 }
 
-// mergeCSVから呼び出すfunction（宛名番号をキーにしてCSVファイルをマージする処理）
 function processCSV(...csvFiles) {
     // 各CSVファイルを解体し、配列に格納する
-    const parsedCSVs = csvFiles.map(parseCSV);
-    // removeFOFromHeaderを呼び出し、住基情報ヘッダー内の「ＦＯ－」を取り除く
+    //const parsedCSVs = csvFiles.map(parseCSV);
+    const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
+    // 住基情報ヘッダー内の「ＦＯ－」を取り除く
     parsedCSVs[0].header = removeFOFromHeader(parsedCSVs[0].header);
-    // removeFIFromHeaderを呼び出し、税情報ヘッダー内の「ＦＩ－」を取り除く
+    // 税情報ヘッダー内の「ＦＩ－」を取り除く
     parsedCSVs[1].header = removeFIFromHeader(parsedCSVs[1].header);
     // flatMap()メソッドを使用して、全てのヘッダーを取得する（重複なし）
     const fullHeader = Array.from(new Set(parsedCSVs.flatMap(parsed => parsed.header)));
     // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
-    parsedCSVs.map(parsed => parsed.header.indexOf('"宛名番号"'));
-    const map = new Map();
+    const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('"宛名番号"'));
     // 各CSVデータをマッピングしマージ処理を行う
+    const map = new Map();
     parsedCSVs.forEach((parsed, fileIndex) => {
         parsed.rows.forEach(row => {
             const addressNumber = row[addressIndex[fileIndex]];
@@ -69,17 +67,16 @@ function processCSV(...csvFiles) {
     return output.join('\n');
 }
 
-// processCSVから呼び出すfunction（住基情報ファイルの各項目頭の「ＦＯ－」を削除する処理）
 function removeFOFromHeader(header) {
+    // 住基情報ヘッダーの「ＦＯ－」を除外する
     return header.map(col => col.replace(/^ＦＯ－/, ''));
 }
 
-// processCSVから呼び出すfunction（住基情報ファイルの各項目頭の「ＦＯ－」を削除する処理）
 function removeFIFromHeader(header) {
-    return header.map(col => col.replace(/^ＦＩ－/, ''));
+    // 税情報ヘッダーの「ＦＩ－」を除外する
+    return header.map(col => col.trim().replace(/^ＦＩ－/, ''));
 }
 
-// processCSVから呼び出すfunction（CSVファイルの解析）
 function parseCSV(csv) {
     // split()メソッドを使用して、CSVファイルの行を'\n'（改行）単位で分解する→1行ずつに分かれる
     const [header, ...rows] = csv.split('\n').map(line => line.trim()).filter(line => line);
@@ -87,8 +84,8 @@ function parseCSV(csv) {
     return { header: header.split(','), rows: rows.map(row => row.split(',')) };
 }
 
-// processCSVから呼び出すfunction（配列を{{項目}: {値}}のオブジェクトに変換する）
 function arrayToObj(headers, row) {
+    // 配列を{{項目}: {値}}のオブジェクトに変換する
     return headers.reduce((obj, header, i) => (obj[header] = row[i], obj), {});
 }
 
@@ -145,7 +142,6 @@ function deleteRowsByAddressNumber() {
     processTwoFiles('file5', 'file6', (csv1, csv2) => deleteRows(csv1, csv2, '"宛名番号"'), '中間ファイル④.csv');
 }
 
-// deleteRowsByAddressNumberから呼び出す関数（一致する行の削除とCSV整形）
 function deleteRows(csvText1, csvText2, key) {
     // CSVテキストを行ごとに分割して配列に変換
     const lines1 = csvText1.split('\n').map(line => line.split(','));
@@ -291,7 +287,6 @@ function generateFixedLengthFile() {
         const lines = text.split('\n').map(line => line.split(','));
         const headers = lines[0];
 
-        // todo：もう1アウトプット（対象者ファイル）で使用するため、function外にする
         // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
         const column1 = { length: 2, name: '"番号体系"', padding: '0', value: '01' };
         const column2 = { length: 15, name: '"宛名番号"', padding: '0' };
@@ -312,7 +307,6 @@ function generateFixedLengthFile() {
         const column17 = { length: 8, name: '"照会開始日付"', padding: ' ' };
         const column18 = { length: 8, name: '"照会終了日付"', padding: ' ' };
         // 全カラムを配列にまとめる
-        // todo：カラムの項目だとわかるような変数名に変更
         const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
             column10, column11, column12, column13, column14, column15, column16, column17, column18];
 
