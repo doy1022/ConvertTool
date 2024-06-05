@@ -465,7 +465,7 @@ function updateheaderless(csvText1, csvText2) {
     return lines1.map(line => line.join(',')).join('\n');
 }
 
-/* 12. 帰化対象者と中間ファイル⑤から税区分コードを抽出しCSVファイルを生成する処理 */
+/* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
 function excludeAndAddTaxCategory() {
 	processTwoFiles('file1', 'file2', processTaxCategory, 'output.csv');
 }
