@@ -496,60 +496,126 @@ function updateheaderless(csvText1, csvText2) {
 
 /* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
 // 2つのファイルをマージし、税区分コードを追加する関数
-function mergeAndAddTaxCodeAndUpdate() {
-    // ファイル1とファイル2のIDを指定して、マージと税区分コードの追加を行う
-    processTwoFiles('file14', 'file15', function (file1Text, file2Text) {
-        // ファイル1のテキストを行ごとに分割し、各行をカンマで区切る
-        const lines1 = file1Text.split('\n').map(line => line.split(','));
-        // ファイル2のテキストを行ごとに分割し、各行をカンマで区切る
-        const lines2 = file2Text.split('\n').map(line => line.split(','));
+function function12() {
 
-        // ヘッダー行を取得
-        const headers1 = lines1[0];
-        const headers2 = lines2[0];
+    // 各ファイルのIDを配列に格納する
+    const fileIds = ['file17', 'file18'];
+    // document.getElementById()メソッド：HTMLのIDタグにマッチするドキュメントを取得する
+    const files = fileIds.map(id => document.getElementById(id).files[0]);
 
-        // 「税区分コード」列の追加
-        headers1.push('税区分コード');
+    if (files.some(file => !file)) {
+        alert("両方のファイルをアップロードしてください。");
+        return;
+    }
 
-        // 新しいヘッダーを使用してCSVファイルのテキストを更新
-        const updatedFile1Text = [headers1.join(',')];
-        const updatedFile2Text = [headers2.join(',')];
+    // FileReaderオブジェクトを生成し、各ファイルの読み込みを行う（map処理内にFileReaderの生成を含む）
+    const readers = files.map(file => new FileReader());
+    const results = [];
 
-        // 宛名番号と課税額のインデックスを取得
-        const atenaIndex1 = headers1.indexOf('宛名番号');
-        const kazeiIndex2 = headers2.indexOf('課税額');
+    // 生成したFileReaderで各ファイルを読み込む
+    readers.forEach((reader, index) => {
+        // 各ファイルの読み込みがすべて完了したタイミングでonload処理が走る（onloadイベント）
+        reader.onload = function (e) {
+            // 読み込んだデータをresults配列の対応する位置に保存する
+            // e.target:イベントが発生したオブジェクト（=FileReaderオブジェクト自体）
+            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+            results[index] = e.target.result;
 
-        // 宛名番号をキーにして課税額をマップにする
-        const kazeiMap = new Map(lines2.map(line => [line[0].trim(), line[kazeiIndex2].trim()]));
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う（4はインプットファイル数）
+            if (results.filter(result => result).length === 2) {
+                try {
+                    // 読み込んだファイル内データのマージをおこなう
+                    //const mergedCSV = processCSV(...results);
 
-        // ファイル1の各行に税区分コードを追加して更新
-        for (let i = 1; i < lines1.length; i++) {
-            const atenaNumber = lines1[i][atenaIndex1].trim();
-            let taxCode = ''; // デフォルトは空白
-            if (kazeiMap.has(atenaNumber)) {
-                const kazeiValue = kazeiMap.get(atenaNumber);
-                if (kazeiValue === '0') {
-                    taxCode = '0'; // 課税の場合
-                } else if (kazeiValue === '') {
-                    taxCode = '1'; // 非課税の場合
-                } else {
-                    taxCode = '2'; // 均等割りのみ課税の場合
+                    const mergedCSV = mergeCSV_12(...results);
+                    downloadCSV(mergedCSV, '中間ファイル⑧.csv');
+                } catch (error) {
+                    alert(error.message);
                 }
             }
-            // 税区分コードを追加
-            lines1[i].push(taxCode);
-            updatedFile1Text.push(lines1[i].join(','));
+        };
+        reader.readAsText(files[index]);
+    });
+
+    function mergeCSV_12(...csvFiles) {
+        // 各CSVファイルを解体し、配列に格納する
+        //const parsedCSVs = csvFiles.map(parseCSV);
+        const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
+        // flatMap()メソッドを使用して、全てのヘッダーを取得する（重複なし）
+        const fullHeader = Array.from(new Set(parsedCSVs.flatMap(parsed => parsed.header)));
+        // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
+        const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('宛名番号'));
+        // 中間ファイル⑧の「課税区分」カラムのインデックスを取得し、配列に保存する
+        const impositionIndex = parsedCSVs[0].header.indexOf('課税区分');
+
+        // 手順1：帰化対象者ファイルのaddressIndexの「宛名番号」列の値を読み取り、配列化
+        //配列の行の分だけループを回す
+        for (nt_row of parsedCSVs[1].rows) {
+            // 帰化対象者の宛名番号
+            let naturalization_target_num = nt_row[addressIndex[1]];
+
+            // 手順2：中間ファイルの「宛名番号」列を手順1で取得した値で検索し、
+            for (m_row of parsedCSVs[0].rows) {
+                let middle_file_num = m_row[addressIndex[0]];// 中間ファイルの「宛名番号」
+                if (naturalization_target_num == middle_file_num) {
+                    //「課税区分」列の値を読み取り
+                    let taxation_information = m_row[impositionIndex];
+                    let taxation_information_code = "";
+                    //　21行目の課税区分が「課税対象」なら0、「非課税」なら1、「均等割りのみ課税」なら2に変換
+                    if (taxation_information === "課税対象") {
+                        taxation_information_code = 0;
+                    } else if (taxation_information === "非課税") {
+                        taxation_information_code = 1;
+                    } else if (taxation_information === "均等割りのみ課税") {
+                        taxation_information_code = 2;
+                    } else if (taxation_information === "") {
+                        taxation_information_code = "";
+                    } else {
+                        logger.error('課税区分が不正です。課税区分：' + taxation_information);
+                        return;
+                    }
+
+                    // 「課税区分」の列を削除す
+                    m_row.splice(impositionIndex, 1);
+                    m_row.push(taxation_information_code);
+
+
+                    
+                    console.log("削除前のCSVデータ:", parsedCSVs[0].rows);// 削除前のCSVデータ
+
+                    
+                    //18行目に「税区分」列を追加
+
+                    //税区分列に全ステップで変換した課税区分を出力する
+
+                }
+            }
         }
-        // ファイル2の内容をそのまま追加
-        for (let i = 1; i < lines2.length; i++) {
-            updatedFile2Text.push(lines2[i].join(','));
+        //ヘッダーから課税区分を消す
+        parsedCSVs[0].header.splice(impositionIndex, 1);
+        parsedCSVs[0].header.push("税区分");
+
+        // 出力用のCSVデータを生成する
+        const output = [parsedCSVs[0].header.join(',')];
+        for(output_row of parsedCSVs[0].rows){
+            output.push(output_row.join(','));
         }
 
-        // 更新されたCSVを文字列に戻す
-        const mergedFileText = updatedFile1Text.join('\n') + '\n' + updatedFile2Text.join('\n');
+        return output.join('\n');
+    }
 
-        return mergedFileText;
-    }, 'マージ後ファイル.csv');
+    // 宛名番号をキーにして課税額をマップにする
+    const kazeiMap = new Map(lines2.map(line => [line[0].trim(), line[kazeiIndex2].trim()]));
+
+    // ファイル2の内容をそのまま追加
+    for (let i = 1; i < lines2.length; i++) {
+        updatedFile2Text.push(lines2[i].join(','));
+    }
+
+    // 更新されたCSVを文字列に戻す
+    const mergedFileText = updatedFile1Text.join('\n') + '\n' + updatedFile2Text.join('\n');
+
+    return mergedFileText;
 }
 
 /* 13.課税対象の住民を除外する処理 */
