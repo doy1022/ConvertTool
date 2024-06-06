@@ -88,9 +88,17 @@ function removeFIFromHeader(header) {
 
 function parseCSV(csv) {
     // split()メソッドを使用して、CSVファイルの行を'\n'（改行）単位で分解する→1行ずつに分かれる
-    const [header, ...rows] = csv.split('\n').map(line => line.trim()).filter(line => line);
-    // split()メソッドを使用して、CSVファイルヘッダー・各行を','単位で分解し、objectとして返す
-    return { header: header.split(','), rows: rows.map(row => row.split(',')) };
+    const [header, ...rows] = csv
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line)
+        .map(line => {
+            return line.split(',').map(field => {
+                return field.replace(/^"|"$/g, '').trim();
+            });
+        });
+    // CSVファイルをヘッダー・各行で分けてobjectとして返す
+    return { header: header, rows: rows.map(row => row) };
 }
 
 function arrayToObj(headers, row) {
@@ -101,18 +109,21 @@ function arrayToObj(headers, row) {
 /* 2.課税対象の住民を除外する処理 */
 function handleFile() {
     // CSVの数が1つの時の汎用処理を呼び出す（引数：①CSVファイルのID ②コールバック関数 ③出力するファイル名）
-    processSingleFile('csvFile1', text => {
-        const lines = text.split('\n').map(line => line.split(','));
-        const headerIndex = lines[0].indexOf('課税区分');
-        if (headerIndex === -1) {
-            alert('課税区分列が見つかりません。');
-            return;
-        }
-        // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が「（課税対象のコード）」ではない行を抽出する
-        const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] !== '課税対象');
-        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return filteredLines.map(line => line.join(',')).join('\n');
-    }, '中間ファイル②.csv');
+    processSingleFile('csvFile1', filterTaxExcluded, '中間ファイル②.csv');
+}
+
+// 課税対象の住民を除外する共通処理関数（ステップ13でも使用するため、別functionとして作成した）
+function filterTaxExcluded(text) {
+    const lines = text.split('\n').map(line => line.split(','));
+    const headerIndex = lines[0].indexOf('課税区分');
+    if (headerIndex === -1) {
+        alert('課税区分列が見つかりません。');
+        return;
+    }
+    // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が「課税対象」ではない行を抽出する
+    const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] !== '課税対象');
+    // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+    return filteredLines.map(line => line.join(',')).join('\n');
 }
 
 /* 3.死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理 */
@@ -146,9 +157,11 @@ function filterDeath() {
     }, '中間ファイル③.csv');
 }
 
+/* 
+
 /* 4.R5給付対象者を、宛名番号をキーとして除外する処理 */
 function deleteRowsByAddressNumber() {
-    processTwoFiles('file5', 'file6', (csv1, csv2) => deleteRows(csv1, csv2, '"宛名番号"'), '中間ファイル④.csv');
+    processTwoFiles('file5', 'file6', (csv1, csv2) => deleteRows(csv1, csv2, '宛名番号'), '中間ファイル④.csv');
 }
 
 function deleteRows(csvText1, csvText2, key) {
@@ -291,41 +304,44 @@ function updateAddressCode(csvText1, csvText2) {
 }
 
 /* 8. 税情報照会用ファイル（固定長形式）を出力する処理 */
-function generateFixedLengthFile() {
-    processSingleFile('file10', text => {
-        const lines = text.split('\n').map(line => line.split(','));
-        const headers = lines[0];
+function generateTaxInfoInquiryFile() {
+    processSingleFile('file10', generateFixedLengthFile, '「税情報なし」対象者.csv');
+}
 
-        // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
-        const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
-        const column2 = { length: 15, name: '宛名番号', padding: '0' };
-        const column3 = { length: 15, name: '統合宛名番号', padding: ' ' };
-        const column4 = { length: 17, name: '照会依頼日時', padding: ' ' };
-        const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', value: '3595115400' };
-        const column6 = { length: 20, name: '情報照会者ユーザーID', padding: ' ' };
-        const column7 = { length: 16, name: '情報照会者機関コード', padding: ' ', value: '0220113112101700' };
-        const column8 = { length: 1, name: '照会側不開示コード', padding: ' ', value: '1' };
-        const column9 = { length: 16, name: '事務コード', padding: ' ', value: 'JM01000000121000' };
-        const column10 = { length: 16, name: '事務手続きコード', padding: ' ', value: 'JT01010000000214' };
-        const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: ' ' };
-        const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: ' ' };
-        const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ' };
-        const column14 = { length: 16, name: '特定個人情報名コード', padding: ' ', value: 'TM00000000000002' };
-        const column15 = { length: 1, name: '照会条件区分', padding: ' ', value: '0' };
-        const column16 = { length: 1, name: '照会年度区分', padding: ' ', value: '0' };
-        const column17 = { length: 8, name: '照会開始日付', padding: ' ' };
-        const column18 = { length: 8, name: '照会終了日付', padding: ' ' };
-        // 全カラムを配列にまとめる
-        const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
-            column10, column11, column12, column13, column14, column15, column16, column17, column18];
+// 中間サーバ照会用のファイルを作成する処理（ステップ15でも使用するため、別functionとして作成した）
+function generateFixedLengthFile(text) {
+    const lines = text.split('\n').map(line => line.split(','));
+    const headers = lines[0];
 
-        return lines.slice(1).map(line => {
-            return columnDefinitions.map(colDef => {
-                const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
-                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
-            }).join('');
-        }).join('\n');
-    }, '「税情報なし」対象者.csv');
+    // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
+    const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
+    const column2 = { length: 15, name: '宛名番号', padding: '0' };
+    const column3 = { length: 15, name: '統合宛名番号', padding: '0' };
+    const column4 = { length: 17, name: '照会依頼日時', padding: '0' };
+    const column5 = { length: 20, name: '情報照会者部署コード', padding: '0', value: '3595115400' };
+    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '0' };
+    const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
+    const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
+    const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
+    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
+    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '0' };
+    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '0' };
+    const column13 = { length: 16, name: '情報提供者機関コード', padding: '0' };
+    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
+    const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
+    const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
+    const column17 = { length: 8, name: '照会開始日付', padding: '0' };
+    const column18 = { length: 8, name: '照会終了日付', padding: '0' };
+    // 全カラムを配列にまとめる
+    const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
+        column10, column11, column12, column13, column14, column15, column16, column17, column18];
+
+    return lines.slice(1).map(line => {
+        return columnDefinitions.map(colDef => {
+            const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
+            return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+        }).join('');
+    }).join('\n');
 }
 
 /* 9. 住基照会用ファイル①を出力する処理 */
@@ -389,7 +405,7 @@ function generateNaturalizedCitizenFile() {
         const column16 = { newName: '消除届出日', oldName: '消除届出日' };
         const column17 = { newName: '消除事由コード', oldName: '消除事由コード' };
 
-        // 全カラムを配列にまとめる（ここで順番も決める！）
+        // 全カラムを配列にまとめる（ここで順番も決める）
         const columnMapping = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
             column10, column11, column12, column13, column14, column15, column16, column17];
 
@@ -442,10 +458,10 @@ function updateFukaByAtenaNumber() {
 }
 
 function updateheaderless(csvText1, csvText2) {
-    var lines1 = csvText1.split('\n').map(function(line) {
+    var lines1 = csvText1.split('\n').map(function (line) {
         return line.split(',');
     });
-    var lines2 = csvText2.split('\n').map(function(line) {
+    var lines2 = csvText2.split('\n').map(function (line) {
         return line.split(',');
     });
     // ヘッダー行を取得
@@ -459,7 +475,7 @@ function updateheaderless(csvText1, csvText2) {
 
     // 宛名番号をキーに課税額をマップにする
     var kazeiMap = {};
-    lines2.forEach(function(line) {
+    lines2.forEach(function (line) {
         kazeiMap[line[atenaIndex2].trim()] = line[kazeiIndex2].trim();
     });
 
@@ -468,12 +484,12 @@ function updateheaderless(csvText1, csvText2) {
         var atenaNumber = lines1[i][atenaIndex1].trim();
         if (kazeiMap.hasOwnProperty(atenaNumber)) {
             var kazeiValue = kazeiMap[atenaNumber];
-            lines1[i][fukaIndex1] = kazeiValue === '0' ? '非課税' : (kazeiValue ? '課税' : '');
+            lines1[i][fukaIndex1] = kazeiValue === '0' ? '非課税' : (kazeiValue ? '課税対象' : '');
         }
     }
 
     // 更新されたCSVを文字列に戻す
-    return lines1.map(function(line) {
+    return lines1.map(function (line) {
         return line.join(',');
     }).join('\n');
 }
@@ -602,7 +618,63 @@ function function12() {
     return mergedFileText;
 }
 
+/* 13.課税対象の住民を除外する処理 */
+function ExcludedFromTaxation() {
+    processSingleFile('file19', filterTaxExcluded, '中間ファイル⑩.csv');
+}
 
+/* 14.税情報無しの住民を除外する処理 */
+function ExcludeNoTaxInfo() {
+    // CSVの数が1つの時の汎用処理を呼び出す（引数：①CSVファイルのID ②コールバック関数 ③出力するファイル名）
+    processSingleFile('file20', text => {
+        const lines = text.split('\n').map(line => line.split(','));
+        const headerIndex = lines[0].indexOf('課税区分');
+        if (headerIndex === -1) {
+            alert('課税区分列が見つかりません。');
+            return;
+        }
+        // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が「（課税対象のコード）」ではない行を抽出する
+        const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] !== '');
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+        return filteredLines.map(line => line.join(',')).join('\n');
+    }, '中間ファイル⑪.csv');
+}
+
+/* 15. 「均等割りのみ課税」「非課税」対象者ファイル（固定長形式）を出力する処理（形式は「税情報無し対象者」リストと同じ） */
+function generateTargetGroupFile() {
+    processSingleFile('file21', generateFixedLengthFile, '「「均等割りのみ課税」「非課税」対象者.csv');
+}
+
+/* 16. 住基照会用ファイル②を出力する処理 */
+/* 税情報無しの住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
+function generateCitizenIDcheckFile2() {
+    processSingleFile('file22', text => {
+        const lines = text.split('\n').map(line => line.split(','));
+        const header = lines[0];
+        const headerIndex = header.indexOf('課税区分');
+
+        if (headerIndex === -1) {
+            alert('課税区分列が見つかりません。');
+            return;
+        }
+
+        // 「宛名番号」と「住民票コード」のインデックスを取得
+        const indexA = header.indexOf('宛名番号');
+        const indexB = header.indexOf('住民票コード');
+
+        if (indexA === -1 || indexB === -1) {
+            alert('宛名番号または住民票コード列が見つかりません。');
+            return;
+        }
+
+        // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が空の行をフィルタリング
+        const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] == '');
+        // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出
+        const extractedLines = filteredLines.map(line => [line[indexA], line[indexB]]);
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+        return extractedLines.map(line => line.join(',')).join('\n');
+    }, '住基照会用ファイル②.csv');
+}
 
 /* 以下、使いまわすメソッド（汎用処理）ここから */
 /* 単一ファイル処理の汎用関数 */
@@ -697,18 +769,18 @@ class Logger {
 
     log(level, message) {
         if (this.levels.indexOf(level) >= this.levels.indexOf(this.level)) {
-          const timestamp = this.getCurrentTime();
-          const logMessage = `[${timestamp}] [${level.toUpperCase()}] \n ${message}`;
-          this.appendLog(logMessage, level);
+            const timestamp = this.getCurrentTime();
+            const logMessage = `[${timestamp}] [${level.toUpperCase()}] \n ${message}`;
+            this.appendLog(logMessage, level);
         }
-      }
-    
-      appendLog(message, level) {
+    }
+
+    appendLog(message, level) {
         const logEntry = document.createElement('div');
         logEntry.textContent = message;
         logEntry.classList.add(`log-${level}`);
         this.logContainer.prepend(logEntry);
-      }
+    }
 
     debug(message) {
         this.log('debug', message);
