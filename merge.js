@@ -480,7 +480,7 @@ function updateheaderless(csvText1, csvText2) {
 
 /* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
 // 2つのファイルをマージし、税区分コードを追加する関数
-function taxinfo_naturalization_merge() {
+function function12() {
 
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file17', 'file18'];
@@ -512,8 +512,7 @@ function taxinfo_naturalization_merge() {
                     //const mergedCSV = processCSV(...results);
 
                     const mergedCSV = mergeCSV_12(...results);
-
-                    //downloadCSV(mergedCSV, '中間ファイル⑧.csv');
+                    downloadCSV(mergedCSV, '中間ファイル⑧.csv');
                 } catch (error) {
                     alert(error.message);
                 }
@@ -545,60 +544,52 @@ function taxinfo_naturalization_merge() {
                 if (naturalization_target_num == middle_file_num) {
                     //「課税区分」列の値を読み取り
                     let taxation_information = m_row[impositionIndex];
+                    let taxation_information_code = "";
                     //　21行目の課税区分が「課税対象」なら0、「非課税」なら1、「均等割りのみ課税」なら2に変換
                     if (taxation_information === "課税対象") {
-                        data[index] = 0;
+                        taxation_information_code = 0;
                     } else if (taxation_information === "非課税") {
-                        data[index] = 1;
+                        taxation_information_code = 1;
                     } else if (taxation_information === "均等割りのみ課税") {
-                        data[index] = 2;
+                        taxation_information_code = 2;
+                    } else if (taxation_information === "") {
+                        taxation_information_code = "";
                     } else {
                         logger.error('課税区分が不正です。課税区分：' + taxation_information);
+                        return;
                     }
-                    //「課税区分」の列を「課税情報」列を更新する
+
+                    // 「課税区分」の列を削除す
+                    m_row.splice(impositionIndex, 1);
+                    m_row.push(taxation_information_code);
+
+
+                    
+                    console.log("削除前のCSVデータ:", parsedCSVs[0].rows);// 削除前のCSVデータ
+
+                    
+                    //18行目に「税区分」列を追加
+
+                    //税区分列に全ステップで変換した課税区分を出力する
+
                 }
             }
         }
+        //ヘッダーから課税区分を消す
+        parsedCSVs[0].header.splice(impositionIndex, 1);
+        parsedCSVs[0].header.push("税区分");
 
-
-        // 各CSVデータをマッピングしマージ処理を行う
-        const map = new Map();
-        parsedCSVs.forEach((parsed, fileIndex) => {
-            parsed.rows.forEach(row => {
-                const addressNumber = row[addressIndex[fileIndex]];
-                map.set(addressNumber, { ...map.get(addressNumber), ...arrayToObj(parsed.header, row) });
-            });
-        });
         // 出力用のCSVデータを生成する
-        const output = [fullHeader.join(',')];
-        map.forEach(value => {
-            const row = fullHeader.map(header => value[header] || '');
-            output.push(row.join(','));
-        });
+        const output = [parsedCSVs[0].header.join(',')];
+        for(output_row of parsedCSVs[0].rows){
+            output.push(output_row.join(','));
+        }
+
         return output.join('\n');
     }
 
     // 宛名番号をキーにして課税額をマップにする
     const kazeiMap = new Map(lines2.map(line => [line[0].trim(), line[kazeiIndex2].trim()]));
-
-    // ファイル1の各行に税区分コードを追加して更新
-    for (let i = 1; i < lines1.length; i++) {
-        const atenaNumber = lines1[i][atenaIndex1].trim();
-        let taxCode = ''; // デフォルトは空白
-        if (kazeiMap.has(atenaNumber)) {
-            const kazeiValue = kazeiMap.get(atenaNumber);
-            if (kazeiValue === '0') {
-                taxCode = '0'; // 課税の場合
-            } else if (kazeiValue === '') {
-                taxCode = '1'; // 非課税の場合
-            } else {
-                taxCode = '2'; // 均等割りのみ課税の場合
-            }
-        }
-        // 税区分コードを追加
-        lines1[i].push(taxCode);
-        updatedFile1Text.push(lines1[i].join(','));
-    }
 
     // ファイル2の内容をそのまま追加
     for (let i = 1; i < lines2.length; i++) {
