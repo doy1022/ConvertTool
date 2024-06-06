@@ -490,9 +490,7 @@ function function12() {
         return;
     }
 
-    // FileReaderオブジェクトを生成し、各ファイルの読み込みを行う（map処理内にFileReaderの生成を含む）
-const readers = files.map(file => new FileReader());
-const results = new Array(files.length).fill(null);
+    
 
 // FileReaderオブジェクトを生成し、各ファイルの読み込みを行う（map処理内にFileReaderの生成を含む）
 const readers = files.map(file => new FileReader());
@@ -508,7 +506,7 @@ readers.forEach((reader, index) => {
         results[index] = e.target.result;
 
         // results配列内のデータがすべてそろったかを確認し、後続処理を行う（4はインプットファイル数）
-        if (results.filter(result => result).length === 4) {
+        if (results.filter(result => result).length === 2) {
             try {
                 // 読み込んだファイル内データのマージをおこなう
                 const mergedCSV = processCSV(...results);
