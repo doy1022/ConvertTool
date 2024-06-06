@@ -8,6 +8,7 @@
 </head>
 
 <body>
+    <div class="tools-container">
     <h1>1.住基情報・税情報・住民票コード・前住所地の住所コードを、宛名番号をキーにしてマージする</h1>
     <form id="csvForm1">
         <label for="file1">住基情報ファイルをアップロードして下さい:</label>
@@ -143,14 +144,59 @@
         <input type="file" id="file23" accept=".csv"><br><br>
         <button type="button" onclick="">SNインポート向け対象者リストを作成する</button>
     </form>
+    </div>
 
-    <h1>SN.「均等割りのみ課税」「非課税」対象者ファイルを整形し、SNにインポートする給付対象者リストを作成する</h1>
-    <form id="csvForm17">
-        <label for="file23">中間ファイル⑪をアップロードしてください:</label>
-        <input type="file" id="file23" accept=".csv"><br><br>
-        <button type="button" onclick="">SNインポート向け対象者リストを作成する</button>
-    </form>
+    <span class="log-container">
+    <h1 class="log-title">ログ出力</h1>
+    <div id="log-box"></div>
+</span>
+    <style>
+        .tools-container {
+            margin: 10px;
+            width: 60%;
+        }
 
+        .log-container {
+            margin: 10px;
+            position: fixed;
+            right: 100px;
+            width: 30%;
+            top: 0%;
+            background-color: rgb(173, 247, 223);
+            border-radius: 5px;
+        }
+        .log-title{
+            text-align: center;
+        }
+
+        #log-box {
+            margin: 10px;
+            height: 500px;
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border-radius: 5px;
+        }
+
+        .log-debug {
+            color: gray;
+        }
+
+        .log-info {
+            color: blue;
+        }
+
+        .log-warn {
+            color: rgb(255, 94, 0);
+        }
+
+        .log-error {
+            color: red;
+        }
+    </style>
+  
     <script src="merge.js"></script>
 </body>
 
