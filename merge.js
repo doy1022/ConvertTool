@@ -564,6 +564,20 @@ function taxinfo_naturalization_merge() {
         // 中間ファイル⑧の「課税区分」カラムのインデックスを取得し、配列に保存する
         const impositionIndex = parsedCSVs[0].header.indexOf('課税区分');
 
+        //帰化対象者の宛名番号を取得
+        for (nt_row of parsedCSVs[0].rows) {
+            //帰化対象者の宛名番号
+            let NFnaturalization_target_num = nt_row[addressIndex[1]];
+
+            for (m_row of parsedCSVs[0].rows) {
+                let middle_file_num = m_row[addressIndex[0]];
+            }
+        }
+        //中間ファイル⑧の宛名番号を取得
+        //filterメソッドを使って重複しない宛名番号を取得
+        //logger.error（'宛名番号が存在しません。宛名番号：'+重複しない宛名番号）;となるようにエラー表示
+
+
         // 手順1：帰化対象者ファイルのaddressIndexの「宛名番号」列の値を読み取り、配列化
         //配列の行の分だけループを回す
         for (nt_row of parsedCSVs[1].rows) {
