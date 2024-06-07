@@ -505,7 +505,7 @@ function updateheaderless(csvText1, csvText2) {
 
 /* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
 // 2つのファイルをマージし、税区分コードを追加する関数
-function function12() {
+function taxinfo_naturalization_merge() {
 
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file17', 'file18'];
