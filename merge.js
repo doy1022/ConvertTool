@@ -1,5 +1,5 @@
 /* 定数定義 */
-const LOG_LEVEL = 'debug';
+const LOG_LEVEL = 'debug'; // Log出力のレベルを選択（debug, info, warn, error）
 
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
@@ -757,6 +757,7 @@ function downloadCSV(content, filename) {
 
 /* 使いまわすメソッド（汎用処理）ここまで */
 
+// ログ出力クラス
 class Logger {
     constructor(level = 'info', logContainerId = 'log-box') {
         this.levels = ['debug', 'info', 'warn', 'error'];
@@ -764,6 +765,7 @@ class Logger {
         this.logContainer = document.getElementById(logContainerId);
     }
 
+    // 現在時刻を取得
     getCurrentTime() {
         const now = new Date();
         const year = now.getFullYear();
@@ -776,6 +778,7 @@ class Logger {
         return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     }
 
+    // ログレベル・時刻・メッセージを結合
     log(level, message) {
         if (this.levels.indexOf(level) >= this.levels.indexOf(this.level)) {
             const timestamp = this.getCurrentTime();
@@ -784,6 +787,7 @@ class Logger {
         }
     }
 
+    // 作成したログをHTML上にセットする
     appendLog(message, level) {
         const logEntry = document.createElement('div');
         logEntry.textContent = message;
@@ -807,5 +811,6 @@ class Logger {
         this.log('error', message);
     }
 }
+
 // ログ出力クラスのインスタンス化
 var logger = new Logger(LOG_LEVEL); // 引数以上のレベルのログのみを出力します（infoの場合、debugログは出力されない）
