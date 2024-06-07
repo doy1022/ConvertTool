@@ -537,7 +537,7 @@ function taxinfo_naturalization_merge() {
             // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
             results[index] = e.target.result;
 
-            // results配列内のデータがすべてそろったかを確認し、後続処理を行う（4はインプットファイル数）
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う（2はインプットファイル数）
             if (results.filter(result => result).length === 2) {
                 try {
                     // 読み込んだファイル内データのマージをおこなう
