@@ -1,162 +1,167 @@
 /* 定数定義 */
 const LOG_LEVEL = 'debug'; // Log出力のレベルを選択（debug, info, warn, error）
+const MIDDLE_FILE_1 = "中間ファイル①.csv";
+const MIDDLE_FILE_2 = "中間ファイル②.csv";
 
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
-
-    logger.debug('デバッグログサンプル');
-    logger.info('情報ログサンプル');
-    logger.warn('警告ログサンプル');
-    logger.error('エラーログサンプル');
-
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file1', 'file2', 'file3', 'file4'];
-    // document.getElementById()メソッド：HTMLのIDタグにマッチするドキュメントを取得する
-    const files = fileIds.map(id => document.getElementById(id).files[0]);
-
-    if (files.some(file => !file)) {
-        alert("4つのCSVファイルをアップロードしてください。");
-        return;
+    // 各ファイルのIDを配列に格納する
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
     }
+
+    // 処理開始log
+    logger.info('STEP 1 処理を開始しました');
 
     // FileReaderオブジェクトを生成し、各ファイルの読み込みを行う（map処理内にFileReaderの生成を含む）
     const readers = files.map(file => new FileReader());
     const results = [];
 
-    // 生成したFileReaderで各ファイルを読み込む
+    // 各ファイルを順に読み込む
     readers.forEach((reader, index) => {
-        // 各ファイルの読み込みがすべて完了したタイミングでonload処理が走る（onloadイベント）
+        // ファイルの読み込みが完了したタイミングでonload処理が走る（onloadイベント）
         reader.onload = function (e) {
-            // 読み込んだデータをresults配列の対応する位置に保存する
-            // e.target:イベントが発生したオブジェクト（=FileReaderオブジェクト自体）
+            // 読み込んだデータをresults配列に保存する
             // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
             results[index] = e.target.result;
 
-            // results配列内のデータがすべてそろったかを確認し、後続処理を行う（4はインプットファイル数）
-            if (results.filter(result => result).length === 4) {
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
                 try {
                     // 読み込んだファイル内データのマージをおこなう
                     const mergedCSV = processCSV(...results);
-                    downloadCSV(mergedCSV, '中間ファイル①.csv');
+                    downloadCSV(mergedCSV, MIDDLE_FILE_1);
                 } catch (error) {
-                    alert(error.message);
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 1 処理を終了しました');
                 }
             }
         };
+
+        // onloadイベントを発火
         reader.readAsText(files[index]);
     });
-}
 
-function processCSV(...csvFiles) {
-    // 各CSVファイルを解体し、配列に格納する
-    //const parsedCSVs = csvFiles.map(parseCSV);
-    const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
-    // 住基情報ヘッダー内の「ＦＯ－」を取り除く
-    parsedCSVs[0].header = removeFOFromHeader(parsedCSVs[0].header);
-    // 税情報ヘッダー内の「ＦＩ－」を取り除く
-    parsedCSVs[1].header = removeFIFromHeader(parsedCSVs[1].header);
-    // flatMap()メソッドを使用して、全てのヘッダーを取得する（重複なし）
-    const fullHeader = Array.from(new Set(parsedCSVs.flatMap(parsed => parsed.header)));
-    // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
-    const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('宛名番号'));
-    // 各CSVデータをマッピングしマージ処理を行う
-    const map = new Map();
-    parsedCSVs.forEach((parsed, fileIndex) => {
-        parsed.rows.forEach(row => {
-            const addressNumber = row[addressIndex[fileIndex]];
-            map.set(addressNumber, { ...map.get(addressNumber), ...arrayToObj(parsed.header, row) });
-        });
-    });
-    // 出力用のCSVデータを生成する
-    const output = [fullHeader.join(',')];
-    map.forEach(value => {
-        const row = fullHeader.map(header => value[header] || '');
-        output.push(row.join(','));
-    });
-    return output.join('\n');
-}
-
-function removeFOFromHeader(header) {
-    // 住基情報ヘッダーの「ＦＯ－」を除外する
-    return header.map(col => col.replace(/^ＦＯ－/, ''));
-}
-
-function removeFIFromHeader(header) {
-    // 税情報ヘッダーの「ＦＩ－」を除外する
-    return header.map(col => col.trim().replace(/^ＦＩ－/, ''));
-}
-
-function parseCSV(csv) {
-    // split()メソッドを使用して、CSVファイルの行を'\n'（改行）単位で分解する→1行ずつに分かれる
-    const [header, ...rows] = csv
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line)
-        .map(line => {
-            return line.split(',').map(field => {
-                return field.replace(/^"|"$/g, '').trim();
+    // マージ処理用function
+    function processCSV(...csvFiles) {
+        // 各CSVファイルをヘッダーとデータ行に分解し、1行ずつ配列に格納する
+        const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
+        // 住基情報ヘッダー内の「ＦＯ－」を取り除く
+        parsedCSVs[0].header = removeStrFromHeader(parsedCSVs[0].header, "ＦＯ－");
+        // 税情報ヘッダー内の「ＦＩ－」を取り除く
+        parsedCSVs[1].header = removeStrFromHeader(parsedCSVs[1].header, "ＦＩ－");
+        // 各CSVファイルのヘッダーを統合して（flatMap）一意なヘッダー（Set）のリストを作成
+        const fullHeader = Array.from(new Set(parsedCSVs.flatMap(parsed => parsed.header)));
+        // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
+        const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('宛名番号'));
+        // 各CSVデータをマッピングしマージ処理を行う
+        const map = new Map();
+        parsedCSVs.forEach((parsed, fileIndex) => {
+            parsed.rows.forEach(row => {
+                const addressNumber = row[addressIndex[fileIndex]];
+                // headersとrowからオブジェクトを生成する
+                const rowObj = parsed.header.reduce((obj, header, i) => {
+                    obj[header] = row[i];
+                    return obj;
+                }, {});
+                map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
             });
         });
-    // CSVファイルをヘッダー・各行で分けてobjectとして返す
-    return { header: header, rows: rows.map(row => row) };
-}
-
-function arrayToObj(headers, row) {
-    // 配列を{{項目}: {値}}のオブジェクトに変換する
-    return headers.reduce((obj, header, i) => (obj[header] = row[i], obj), {});
+        // 出力用のCSVデータを生成する
+        const output = [fullHeader.join(',')];
+        map.forEach(value => {
+            const row = fullHeader.map(header => value[header] || '');
+            output.push(row.join(','));
+        });
+        return output.join('\n');
+    }
 }
 
 /* 2.課税対象の住民を除外する処理 */
 function handleFile() {
-    // CSVの数が1つの時の汎用処理を呼び出す（引数：①CSVファイルのID ②コールバック関数 ③出力するファイル名）
-    processSingleFile('csvFile1', filterTaxExcluded, '中間ファイル②.csv');
-}
-
-// 課税対象の住民を除外する共通処理関数（ステップ13でも使用するため、別functionとして作成した）
-function filterTaxExcluded(text) {
-    const lines = text.split('\n').map(line => line.split(','));
-    const headerIndex = lines[0].indexOf('課税区分');
-    if (headerIndex === -1) {
-        alert('課税区分列が見つかりません。');
-        return;
+    // 各ファイルのIDを配列に格納する
+    const fileIds = ['midFile1'];
+    // 各ファイルのIDを配列に格納する
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
     }
-    // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が「課税対象」ではない行を抽出する
-    const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] !== '課税対象');
-    // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-    return filteredLines.map(line => line.join(',')).join('\n');
-}
 
-/* 3.死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理 */
-function filterDeath() {
-    processSingleFile('csvFile2', text => {
-        const lines = text.split('\n').map(line => line.split(','));
-        const headers = lines[0];
-        const membersIndex = headers.indexOf('世帯員の人数');
-        const removalDateIndex = headers.indexOf('消除日');
-        const notificationDateIndex = headers.indexOf('消除届出日');
-        const reasonCodeIndex = headers.indexOf('消除事由コード');
+    // 処理開始log
+    logger.info('STEP 2 処理を開始しました');
 
-        if ([membersIndex, removalDateIndex, notificationDateIndex, reasonCodeIndex].includes(-1)) {
-            alert('必要な列が見つかりません。');
-            return;
+    // 読み込んだデータをresults配列の対応する位置に保存する
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+            let text = e.target.result;
+
+            // 必要なヘッダーがあるかチェック
+            const lines = text.split('\n').map(line => line.split(','));
+            const headers = lines[0];
+            const requiredColumns = [
+                '世帯員の人数', 
+                '消除日', 
+                '消除届出日', 
+                '消除事由コード'
+            ];
+            // カラムのインデックスを取得
+            const columnIndices = requiredColumns.map(col => headers.indexOf(col));
+            // 足りないカラムをチェック
+            const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+            if (missingColumns.length > 0) {
+                throw new Error (`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+            }
+
+            // 課税対象の住民を除外する処理
+            const filterTaxExcludedText = filterTaxExcluded(text);
+            if (!filterTaxExcludedText) {
+                logger.warn("出力対象レコードが存在しませんでした。");
+            } else {
+                // 死亡している住民を除外する処理
+                const filterDeathText = filterDeath(filterTaxExcludedText, columnIndices)
+                if (!filterDeathText) {
+                    logger.warn("出力対象レコードが存在しませんでした。");
+                } else {
+                    downloadCSV(filterDeathText, MIDDLE_FILE_2);
+                }
+            }
+        } catch (error) {
+            // catchしたエラーを表示
+            logger.error(error);
+        } finally {
+            logger.info('STEP 2 処理を終了しました');
         }
+    };
+    // onloadイベントを発火
+    reader.readAsText(files[0]);
 
-        // フィルタリング処理を実行
-        const filteredLines = lines.filter((line, index) => {
-            if (index === 0) return true; // ヘッダー行は保持する
+    /* 死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理 */
+    function filterDeath(text,columnIndices) {
+        // ヘッダーとデータレコーダーに分割
+        const { header, rows } = parseCSV(text);
+
+        // 条件に合致するレコードのみをフィルタ
+        const filteredLines = rows.filter(line => {
             const [members, removalDate, notificationDate, reasonCode] = [
-                line[membersIndex],
-                line[removalDateIndex],
-                line[notificationDateIndex],
-                line[reasonCodeIndex]
+                line[columnIndices[0]],
+                line[columnIndices[1]],
+                line[columnIndices[2]],
+                line[columnIndices[3]]
             ];
             return !(members === '1' && removalDate && notificationDate && reasonCode);
         });
 
-        return filteredLines.map(line => line.join(',')).join('\n');
-    }, '中間ファイル③.csv');
+        return [header.join(','), ...filteredLines.map(line => line.join(','))].join('\n');
+    }
 }
-
 /* 
 
 /* 4.R5給付対象者を、宛名番号をキーとして除外する処理 */
@@ -316,22 +321,22 @@ function generateFixedLengthFile(text) {
     // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
     const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
     const column2 = { length: 15, name: '宛名番号', padding: '0' };
-    const column3 = { length: 15, name: '統合宛名番号', padding: ''};
-    const column4 = { length: 17, name: '照会依頼日時'};
+    const column3 = { length: 15, name: '統合宛名番号', padding: '' };
+    const column4 = { length: 17, name: '照会依頼日時' };
     const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
-    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: ''};
+    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
     const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
     const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
     const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
     const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
-    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: ''};
-    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: ''};
+    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
+    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
     const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ', padDirection: 'right' };
     const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
     const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
     const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
-    const column17 = { length: 8, name: '照会開始日付', padding: ''};
-    const column18 = { length: 8, name: '照会終了日付', padding: ''};
+    const column17 = { length: 8, name: '照会開始日付', padding: '' };
+    const column18 = { length: 8, name: '照会終了日付', padding: '' };
     // 全カラムを配列にまとめる
     const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
         column10, column11, column12, column13, column14, column15, column16, column17, column18];
@@ -695,6 +700,32 @@ function generateCitizenIDcheckFile2() {
 }
 
 /* 以下、使いまわすメソッド（汎用処理）ここから */
+
+/**
+ * 必要なファイルがすべてアップロードされているかのチェック
+ * @param {string[]} fileIds 入力ファイル名の1次元配列
+ * @returns {{ check: boolean, file_num: number, files: object }} チェック結果のオブジェクト
+ * @property {boolean} check - チェック結果
+ * @property {number} file_num - 理論ファイル数
+ * @property {object} files - ファイルオブジェクト
+ */
+function fileCheck(fileIds) {
+    let check = false;
+    // 読み込むファイル数
+    const file_num = fileIds.length;
+    // document.getElementById()メソッド：HTMLのIDタグにマッチするドキュメントを取得する
+    const files = fileIds.map(id => document.getElementById(id).files[0]);
+
+    // ファイル数のチェック
+    if (files.some(file => !file)) {
+        alert("すべて( " + file_num + "個 )のファイルをアップロードしてください。");
+    }
+    else {
+        check = true;
+    }
+    return { check, file_num, files };
+}
+
 /* 単一ファイル処理の汎用関数 */
 function processSingleFile(fileId, processFunc, outputFilename) {
     const file = document.getElementById(fileId).files[0];
@@ -753,7 +784,28 @@ function processTwoFiles(fileId1, fileId2, processFunc, outputFilename) {
     reader2.readAsText(file2);
 }
 
-/* CSVファイルのダウンロード処理 */
+/**
+ * 課税対象の住民を除外する関数
+ * @param {string} text csvファイルのデータを文字列化して入力
+ * @return {string} 課税対象の住民を除外したcsvcsvファイルのデータを文字列化して出力
+ */
+function filterTaxExcluded(text) {
+    const lines = text.split('\n').map(line => line.split(','));
+    const headerIndex = lines[0].indexOf('課税区分');
+    if (headerIndex === -1) {
+        throw ('課税区分列が見つかりません。');
+    }
+    // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が「課税対象」ではない行を抽出する
+    const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] !== '課税対象');
+    // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+    return filteredLines.map(line => line.join(',')).join('\n');
+}
+
+/**
+ * CSVファイルのダウンロード処理
+ * @param {string} content csvファイルのデータを文字列化して入力
+ * @param {string} filename 出力するファイルのファイル名
+ */
 function downloadCSV(content, filename) {
     const blob = new Blob([content], { type: 'text/csv' });
     const link = document.createElement('a');
@@ -762,6 +814,34 @@ function downloadCSV(content, filename) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+/**
+ * ヘッダーの文字から前方一致で任意の文字列を削除する
+ * @param {array} header 1次元配列形式でヘッダーを入力
+ * @param {string} deleteStr 削除する文字列
+ */
+function removeStrFromHeader(header, deleteStr) {
+    const delRegex = new RegExp("^" + deleteStr);
+    return header.map(col => col.replace(delRegex, ''));
+}
+
+/**
+ * 各CSV（DAT）ファイルをヘッダーとデータ行に分解し、1行ずつ配列に格納する
+ * @param {String} text FileReaderが読み込んだファイル文字列（e.target.result）
+ */
+function parseCSV(text) {
+    const [header, ...rows] = text
+        .split('\n')                // split()メソッドを使用して、CSVファイルの行を'\n'（改行）単位で分解
+        .map(line => line.trim())   // 各行の前後に空白文字がある場合削除
+        .filter(line => line)       // 空行がある場合削除
+        .map(line => {
+            return line.split(',').map(field => {           // 各行をカンマ , で分割してフィールドに分ける
+                return field.replace(/^"|"$/g, '').trim();  //各フィールドの前後に引用符（"）がある場合削除し、前後の空白も削除
+            });
+        });
+    // CSVファイルをヘッダー・各行で分けてobjectとして返す
+    return { header: header, rows: rows.map(row => row) };
 }
 
 /* 使いまわすメソッド（汎用処理）ここまで */
@@ -791,7 +871,7 @@ class Logger {
     log(level, message) {
         if (this.levels.indexOf(level) >= this.levels.indexOf(this.level)) {
             const timestamp = this.getCurrentTime();
-            const logMessage = `[${timestamp}] [${level.toUpperCase()}] \n ${message}`;
+            const logMessage = `[${timestamp}] [${level.toUpperCase()}] \n${message}`;
             this.appendLog(logMessage, level);
         }
     }
@@ -801,7 +881,8 @@ class Logger {
         const logEntry = document.createElement('div');
         logEntry.textContent = message;
         logEntry.classList.add(`log-${level}`);
-        this.logContainer.prepend(logEntry);
+        this.logContainer.appendChild(logEntry);
+        this.logContainer.scrollTop = this.logContainer.scrollHeight;
     }
 
     debug(message) {
