@@ -612,19 +612,7 @@ function taxinfo_naturalization_merge() {
 
         return output.join('\n');
     }
-
-    // 宛名番号をキーにして課税額をマップにする
-    const kazeiMap = new Map(lines2.map(line => [line[0].trim(), line[kazeiIndex2].trim()]));
-
-    // ファイル2の内容をそのまま追加
-    for (let i = 1; i < lines2.length; i++) {
-        updatedFile2Text.push(lines2[i].join(','));
-    }
-
-    // 更新されたCSVを文字列に戻す
-    const mergedFileText = updatedFile1Text.join('\n') + '\n' + updatedFile2Text.join('\n');
-
-    return mergedFileText;
+    
 }
 
 /* 13.課税対象の住民を除外する処理 */
