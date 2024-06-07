@@ -511,6 +511,13 @@ function taxinfo_naturalization_merge() {
     const fileIds = ['file17', 'file18'];
     // document.getElementById()メソッド：HTMLのIDタグにマッチするドキュメントを取得する
     const files = fileIds.map(id => document.getElementById(id).files[0]);
+    const fileName = files[0].name;
+    //const fileExtension = fileName.split('.').pop().toLowerCase();
+
+    if (fileName != '中間ファイル⑧.csv') {
+        alert("「中間ファイル⑧.csv」をアップロードしてください。");
+        return;
+    }
 
     if (files.some(file => !file)) {
         alert("両方のファイルをアップロードしてください。");
@@ -589,10 +596,10 @@ function taxinfo_naturalization_merge() {
                     m_row.push(taxation_information_code);
 
 
-                    
+
                     console.log("削除前のCSVデータ:", parsedCSVs[0].rows);// 削除前のCSVデータ
 
-                    
+
                     //18行目に「税区分」列を追加
 
                     //税区分列に全ステップで変換した課税区分を出力する
@@ -606,13 +613,13 @@ function taxinfo_naturalization_merge() {
 
         // 出力用のCSVデータを生成する
         const output = [parsedCSVs[0].header.join(',')];
-        for(output_row of parsedCSVs[0].rows){
+        for (output_row of parsedCSVs[0].rows) {
             output.push(output_row.join(','));
         }
 
         return output.join('\n');
     }
-    
+
 }
 
 /* 13.課税対象の住民を除外する処理 */
