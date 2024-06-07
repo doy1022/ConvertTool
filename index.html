@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSVファイルマージ＆フィルタリングツール</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -24,6 +24,7 @@
 
     <h1>2.課税対象の住民を除外する</h1>
     <form id="csvForm2">
+
         <label for="csvFile1">中間ファイル①をアップロードして下さい:</label>
         <input type="file" id="csvFile1" accept=".csv"><br><br>
         <button type="button" onclick="handleFile()">中間ファイル②を作成する</button>
@@ -147,56 +148,9 @@
     </div>
 
     <span class="log-container">
-    <h1 class="log-title">ログ出力</h1>
-    <div id="log-box"></div>
-</span>
-    <style>
-        .tools-container {
-            margin: 10px;
-            width: 60%;
-        }
-
-        .log-container {
-            margin: 10px;
-            position: fixed;
-            right: 100px;
-            width: 30%;
-            top: 0%;
-            background-color: rgb(173, 247, 223);
-            border-radius: 5px;
-        }
-        .log-title{
-            text-align: center;
-        }
-
-        #log-box {
-            margin: 10px;
-            height: 500px;
-            background-color: #f9f9f9;
-            border: 1px solid #ccc;
-            padding: 10px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            border-radius: 5px;
-        }
-
-        .log-debug {
-            color: gray;
-        }
-
-        .log-info {
-            color: blue;
-        }
-
-        .log-warn {
-            color: rgb(255, 94, 0);
-        }
-
-        .log-error {
-            color: red;
-        }
-    </style>
-  
+        <h1 class="log-title">ログ出力</h1>
+        <div id="log-box"></div>
+    </span>
     <script src="merge.js"></script>
 </body>
 
