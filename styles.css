@@ -1,0 +1,45 @@
+.tools-container {
+    margin: 10px;
+    width: 60%;
+}
+
+.log-container {
+    margin: 10px;
+    position: fixed;
+    right: 0px;
+    width: 35%;
+    top: 0%;
+    background-color: rgb(173, 247, 223);
+    border-radius: 5px;
+}
+
+.log-title {
+    text-align: center;
+}
+
+#log-box {
+    margin: 10px;
+    height: 600px;
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    padding: 10px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    border-radius: 5px;
+}
+
+.log-debug {
+    color: gray;
+}
+
+.log-info {
+    color: blue;
+}
+
+.log-warn {
+    color: rgb(255, 94, 0);
+}
+
+.log-error {
+    color: red;
+}
