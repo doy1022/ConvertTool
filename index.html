@@ -54,7 +54,7 @@
             <button type="button" onclick="deleteRowsByReason()">中間ファイル⑤を作成する</button>
         </form>
 
-        <h1>6.「課税区分」に値が入っている（税情報がある）住民を除外する</h1>
+        <h1>6.「課税区分」に値が入っている（税情報がある）住民を除外し、税情報無し対象者ファイルを作成する</h1>
         <form id="csvForm6">
             <label for="file9">中間ファイル⑤をアップロードして下さい:</label>
             <input type="file" id="file9" accept=".csv"><br><br>
@@ -106,7 +106,7 @@
             <input type="file" id="file17" accept=".csv"><br><br>
             <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
             <input type="file" id="file18" accept=".csv"><br><br>
-            <button type="button" onclick="taxinfo_naturalization_merge">中間ファイル⑨を作成する</button>
+            <button type="button" onclick="taxinfo_naturalization_merge()">中間ファイル⑨を作成する</button>
         </form>
 
         <h1>13.課税対象の住民を除外する</h1>
