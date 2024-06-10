@@ -248,116 +248,167 @@ function deleteRowsWithAssessment() {
         const filteredLines = lines.filter((line, index) => index === 0 || !line[assessmentIndex].trim());
         return filteredLines.map(line => line.join(',')).join('\n');
     }, '中間ファイル⑥.csv');
-
-
-    /* 7.機関コードの変換処理*/
-    function ChangeRowsFromInstitutionCode() {
-        processTwoFiles('file11', 'file12', updateAddressCode, '中間ファイル⑦.csv');
-    }
-
-    function updateAddressCode(csvText1, csvText2) {
-        // csvText1とcsvText2をそれぞれ分割して配列に変換
-        const lines1 = csvText1.split('\n').map(line => line.split(','));
-        const lines2 = csvText2.split('\n').map(line => line.split(','));
-        // ヘッダー行を取得
-        const headers1 = lines1[0];
-        const headers2 = lines2[0];
-        // 各項目の位置を確認する
-        const addressCodeIndex = headers1.indexOf('転入元都道府県市区町村コード');
-        const idCodeIndex = headers2.indexOf('既存の識別コード');
-        const agencyCodeIndex = headers2.indexOf('機関コード');
-
-        if (addressCodeIndex === -1 || idCodeIndex === -1 || agencyCodeIndex === -1) {
-            alert('必要な列が見つかりません。');
-            return;
-        }
-
-        // CSV1（住民リストの方）のヘッダーに新しいカラムを追加する
-        headers1.push('情報提供者機関コード');
-
-        const idCodeMap = new Map();
-        lines2.slice(1).forEach((line, idx) => {
-            // 欠落しているデータがあるかチェック
-            if (!line[idCodeIndex] || !line[agencyCodeIndex]) {
-                console.log(`Data missing in line ${idx + 2}:`, line);
-            }
-            // IDコードと機関コードを取得し、クオートを除去
-            const idCode = (line[idCodeIndex] ? line[idCodeIndex].trim() : '').replace(/^"|"$/g, '');
-            const agencyCode = (line[agencyCodeIndex] ? line[agencyCodeIndex].trim() : '').replace(/^"|"$/g, '');
-            // マップにIDと機関コードをセット
-            idCodeMap.set(idCode, agencyCode);
-        });
-
-        const updatedLines = lines1.map((line, index) => {
-            // データの欠落をチェック
-            if (!line[addressCodeIndex]) {
-                console.log(`Data missing in line ${index + 1}:`, line);
-            }
-            if (index === 0) {
-                // ヘッダー行はそのまま返す
-                return line;
-            }
-            // 転入元都道府県市区町村コードを取得し、対応する機関コードを検索
-            const addressCode = line[addressCodeIndex] ? line[addressCodeIndex].trim() : '';
-            const agencyCode = idCodeMap.get(addressCode) || '';
-            // 新しいカラムに機関コードを追加
-            line.push(agencyCode);
-            return line;
-        });
-        // 更新された行をCSV形式で結合して返す
-        return updatedLines.map(line => line.join(',')).join('\n');
-    }
-
-    /* 8. 税情報照会用ファイル（固定長形式）を出力する処理 */
-    function generateTaxInfoInquiryFile() {
-        processSingleFile('file10', generateFixedLengthFile, '「税情報なし」対象者.csv');
-    }
-
-    // 中間サーバ照会用のファイルを作成する処理（ステップ15でも使用するため、別functionとして作成した）
-    function generateFixedLengthFile(text) {
-        const lines = text.split('\n').map(line => line.split(','));
-        const headers = lines[0];
-
-        // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
-        const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
-        const column2 = { length: 15, name: '宛名番号', padding: '0' };
-        const column3 = { length: 15, name: '統合宛名番号', padding: '' };
-        const column4 = { length: 17, name: '照会依頼日時' };
-        const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
-        const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
-        const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
-        const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
-        const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
-        const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
-        const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
-        const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
-        const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ', padDirection: 'right' };
-        const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
-        const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
-        const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
-        const column17 = { length: 8, name: '照会開始日付', padding: '' };
-        const column18 = { length: 8, name: '照会終了日付', padding: '' };
-        // 全カラムを配列にまとめる
-        const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
-            column10, column11, column12, column13, column14, column15, column16, column17, column18];
-
-        return lines.slice(1).map(line => {
-            return columnDefinitions.map(colDef => {
-                const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
-                if (colDef.padDirection === 'left') {
-                    // 左側をパディング
-                    return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
-                } else if (colDef.padDirection === 'right') {
-                    // 右側をパディング
-                    return value.padEnd(colDef.length, colDef.padding).substring(0, colDef.length);
-                } else {
-                    // デフォルトは左側をパディング
-                    return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
-                }
-            }).join(',');
-        }).join('\n');
-    }
 }
+
+/* 8. 税情報照会用ファイル（固定長形式）を出力する処理 */
+function generateTaxInfoInquiryFile() {
+    processSingleFile('file10', generateFixedLengthFile, '「税情報なし」対象者.csv');
+}
+
+// 中間サーバ照会用のファイルを作成する処理（ステップ15でも使用するため、別functionとして作成した）
+function generateFixedLengthFile(text) {
+    const lines = text.split('\n').map(line => line.split(','));
+    const headers = lines[0];
+
+    // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
+    const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
+    const column2 = { length: 15, name: '宛名番号', padding: '0' };
+    const column3 = { length: 15, name: '統合宛名番号', padding: '' };
+    const column4 = { length: 17, name: '照会依頼日時' };
+    const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
+    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
+    const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
+    const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
+    const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
+    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
+    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
+    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
+    const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ', padDirection: 'right' };
+    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
+    const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
+    const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
+    const column17 = { length: 8, name: '照会開始日付', padding: '' };
+    const column18 = { length: 8, name: '照会終了日付', padding: '' };
+    // 全カラムを配列にまとめる
+    const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
+        column10, column11, column12, column13, column14, column15, column16, column17, column18];
+
+    return lines.slice(1).map(line => {
+        return columnDefinitions.map(colDef => {
+            const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
+            if (colDef.padDirection === 'left') {
+                // 左側をパディング
+                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+            } else if (colDef.padDirection === 'right') {
+                // 右側をパディング
+                return value.padEnd(colDef.length, colDef.padding).substring(0, colDef.length);
+            } else {
+                // デフォルトは左側をパディング
+                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+            }
+        }).join(',');
+    }).join('\n');
+}
+
+
+/* 7.機関コードの変換処理*/
+function ChangeRowsFromInstitutionCode() {
+    processTwoFiles('file11', 'file12', updateAddressCode, '中間ファイル⑦.csv');
+}
+
+function updateAddressCode(csvText1, csvText2) {
+    // csvText1とcsvText2をそれぞれ分割して配列に変換
+    const lines1 = csvText1.split('\n').map(line => line.split(','));
+    const lines2 = csvText2.split('\n').map(line => line.split(','));
+    // ヘッダー行を取得
+    const headers1 = lines1[0];
+    const headers2 = lines2[0];
+    // 各項目の位置を確認する
+    const addressCodeIndex = headers1.indexOf('転入元都道府県市区町村コード');
+    const idCodeIndex = headers2.indexOf('既存の識別コード');
+    const agencyCodeIndex = headers2.indexOf('機関コード');
+
+    if (addressCodeIndex === -1 || idCodeIndex === -1 || agencyCodeIndex === -1) {
+        alert('必要な列が見つかりません。');
+        return;
+    }
+
+    // CSV1（住民リストの方）のヘッダーに新しいカラムを追加する
+    headers1.push('情報提供者機関コード');
+
+    const idCodeMap = new Map();
+    lines2.slice(1).forEach((line, idx) => {
+        // 欠落しているデータがあるかチェック
+        if (!line[idCodeIndex] || !line[agencyCodeIndex]) {
+            console.log(`Data missing in line ${idx + 2}:`, line);
+        }
+        // IDコードと機関コードを取得し、クオートを除去
+        const idCode = (line[idCodeIndex] ? line[idCodeIndex].trim() : '').replace(/^"|"$/g, '');
+        const agencyCode = (line[agencyCodeIndex] ? line[agencyCodeIndex].trim() : '').replace(/^"|"$/g, '');
+        // マップにIDと機関コードをセット
+        idCodeMap.set(idCode, agencyCode);
+    });
+
+    const updatedLines = lines1.map((line, index) => {
+        // データの欠落をチェック
+        if (!line[addressCodeIndex]) {
+            console.log(`Data missing in line ${index + 1}:`, line);
+        }
+        if (index === 0) {
+            // ヘッダー行はそのまま返す
+            return line;
+        }
+        // 転入元都道府県市区町村コードを取得し、対応する機関コードを検索
+        const addressCode = line[addressCodeIndex] ? line[addressCodeIndex].trim() : '';
+        const agencyCode = idCodeMap.get(addressCode) || '';
+        // 新しいカラムに機関コードを追加
+        line.push(agencyCode);
+        return line;
+    });
+    // 更新された行をCSV形式で結合して返す
+    return updatedLines.map(line => line.join(',')).join('\n');
+}
+
+/* 8. 税情報照会用ファイル（固定長形式）を出力する処理 */
+function generateTaxInfoInquiryFile() {
+    processSingleFile('file10', generateFixedLengthFile, '「税情報なし」対象者.csv');
+}
+
+// 中間サーバ照会用のファイルを作成する処理（ステップ15でも使用するため、別functionとして作成した）
+function generateFixedLengthFile(text) {
+    const lines = text.split('\n').map(line => line.split(','));
+    const headers = lines[0];
+
+    // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
+    const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
+    const column2 = { length: 15, name: '宛名番号', padding: '0' };
+    const column3 = { length: 15, name: '統合宛名番号', padding: '' };
+    const column4 = { length: 17, name: '照会依頼日時' };
+    const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
+    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
+    const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
+    const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
+    const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
+    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
+    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
+    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
+    const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ', padDirection: 'right' };
+    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
+    const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
+    const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
+    const column17 = { length: 8, name: '照会開始日付', padding: '' };
+    const column18 = { length: 8, name: '照会終了日付', padding: '' };
+    // 全カラムを配列にまとめる
+    const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
+        column10, column11, column12, column13, column14, column15, column16, column17, column18];
+
+    return lines.slice(1).map(line => {
+        return columnDefinitions.map(colDef => {
+            const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
+            if (colDef.padDirection === 'left') {
+                // 左側をパディング
+                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+            } else if (colDef.padDirection === 'right') {
+                // 右側をパディング
+                return value.padEnd(colDef.length, colDef.padding).substring(0, colDef.length);
+            } else {
+                // デフォルトは左側をパディング
+                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+            }
+        }).join(',');
+    }).join('\n');
+}
+
 /* 9. 住基照会用ファイル①を出力する処理 */
 /* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
 function generateReferencingFile1() {
