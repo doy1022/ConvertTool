@@ -246,60 +246,10 @@ function deleteRowsWithAssessment() {
             return;
         }
         const filteredLines = lines.filter((line, index) => index === 0 || !line[assessmentIndex].trim());
-        return filteredLines.map(line => line.join(',')).join('\n');
-    }, '中間ファイル⑥.csv');
+        // 
+        return generateFixedLengthFile(filteredLines.map(line => line.join(',')).join('\n'));
+    }, '「税情報なし」対象者.csv');
 }
-
-/* 8. 税情報照会用ファイル（固定長形式）を出力する処理 */
-function generateTaxInfoInquiryFile() {
-    processSingleFile('file10', generateFixedLengthFile, '「税情報なし」対象者.csv');
-}
-
-// 中間サーバ照会用のファイルを作成する処理（ステップ15でも使用するため、別functionとして作成した）
-function generateFixedLengthFile(text) {
-    const lines = text.split('\n').map(line => line.split(','));
-    const headers = lines[0];
-
-    // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
-    const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
-    const column2 = { length: 15, name: '宛名番号', padding: '0' };
-    const column3 = { length: 15, name: '統合宛名番号', padding: '' };
-    const column4 = { length: 17, name: '照会依頼日時' };
-    const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
-    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
-    const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
-    const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
-    const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
-    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
-    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
-    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
-    const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ', padDirection: 'right' };
-    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
-    const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
-    const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
-    const column17 = { length: 8, name: '照会開始日付', padding: '' };
-    const column18 = { length: 8, name: '照会終了日付', padding: '' };
-    // 全カラムを配列にまとめる
-    const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
-        column10, column11, column12, column13, column14, column15, column16, column17, column18];
-
-    return lines.slice(1).map(line => {
-        return columnDefinitions.map(colDef => {
-            const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
-            if (colDef.padDirection === 'left') {
-                // 左側をパディング
-                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
-            } else if (colDef.padDirection === 'right') {
-                // 右側をパディング
-                return value.padEnd(colDef.length, colDef.padding).substring(0, colDef.length);
-            } else {
-                // デフォルトは左側をパディング
-                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
-            }
-        }).join(',');
-    }).join('\n');
-}
-
 
 /* 7.機関コードの変換処理*/
 function ChangeRowsFromInstitutionCode() {
