@@ -106,9 +106,9 @@ function handleFile() {
             const lines = text.split('\n').map(line => line.split(','));
             const headers = lines[0];
             const requiredColumns = [
-                '世帯員の人数', 
-                '消除日', 
-                '消除届出日', 
+                '世帯員の人数',
+                '消除日',
+                '消除届出日',
                 '消除事由コード'
             ];
             // カラムのインデックスを取得
@@ -117,7 +117,7 @@ function handleFile() {
             const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
             if (missingColumns.length > 0) {
-                throw new Error (`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+                throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
             }
 
             // 課税対象の住民を除外する処理
@@ -144,7 +144,7 @@ function handleFile() {
     reader.readAsText(files[0]);
 
     /* 死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理 */
-    function filterDeath(text,columnIndices) {
+    function filterDeath(text, columnIndices) {
         // ヘッダーとデータレコーダーに分割
         const { header, rows } = parseCSV(text);
 
@@ -472,12 +472,33 @@ function updateFukaByAtenaNumber() {
 }
 
 function updateheaderless(csvText1, csvText2) {
+
+    const fileInput1 = document.getElementById('file15');
+    const fileInput2 = document.getElementById('file16');
+
+    fileInput1.addEventListener('change', handleFileSelect);
+    fileInput2.addEventListener('change', handleFileSelect);
+
+    function handleFileSelect(event) {
+        const selectedFile = event.target.files[0];
+        if (!selectedFile) return; // ファイルが選択されていない場合は処理を中断
+
+        const allowedFileName = event.target.id === 'file15' ? '中間ファイル⑤.csv' : '番号連携照会結果.csv';
+
+        if (selectedFile.name !== allowedFileName) {
+            alert(`正しいファイルをアップロードしてください。(${allowedFileName} をアップロードしてください)`);
+            event.target.value = ''; // ファイル選択ボックスをクリア
+        }
+    }
+
+    //ここから既存処理
     var lines1 = csvText1.split('\n').map(function (line) {
         return line.split(',');
     });
     var lines2 = csvText2.split('\n').map(function (line) {
         return line.split(',');
     });
+
     // ヘッダー行を取得
     var headers1 = lines1[0];
     // 宛名番号と課税区分のインデックスを取得
@@ -510,17 +531,26 @@ function updateheaderless(csvText1, csvText2) {
 
 /* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
 // 2つのファイルをマージし、税区分コードを追加する関数
-function taxinfo_naturalization_merge() {
+function updateFukaByAtenaNumber() {
+    processTwoFiles('file17', 'file18', updateheaderless, '中間ファイル⑧.csv');
+}
 
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file17', 'file18'];
     // document.getElementById()メソッド：HTMLのIDタグにマッチするドキュメントを取得する
     const files = fileIds.map(id => document.getElementById(id).files[0]);
     const fileName = files[0].name;
+    const fileName2 = files[1].name;
     //const fileExtension = fileName.split('.').pop().toLowerCase();
+
 
     if (fileName != '中間ファイル⑧.csv') {
         alert("「中間ファイル⑧.csv」をアップロードしてください。");
+        return;
+    }
+
+    if (fileName2 != '帰化対象者.csv') {
+        alert("「帰化対象者.csv」をアップロードしてください。");
         return;
     }
 
@@ -582,6 +612,21 @@ function taxinfo_naturalization_merge() {
         //filterメソッドを使って重複しない宛名番号を取得
         //logger.error（'宛名番号が存在しません。宛名番号：'+重複しない宛名番号）;となるようにエラー表示
 
+        // 中間ファイルの宛名番号を配列に取得
+        let middle_file_nums = parsedCSVs[0].rows.map(m_row => m_row[addressIndex[1]]);
+
+        // 帰化対象者の宛名番号を取得し、比較する
+        let extraction = parsedCSVs[1].rows.filter(nt_row => {
+            let NFnaturalization_target_num = nt_row[addressIndex[1]];
+
+            // 中間ファイルに存在しないか確認
+            return !middle_file_nums.includes(NFnaturalization_target_num);
+        }).map(nt_row => nt_row[addressIndex[1]]);
+
+        // エラーメッセージの出力
+        if (extraction.length > 0) {
+            logger.error('中間ファイルに存在しない宛名番号があります。宛名番号：' + extraction.join(','));
+        }
 
         // 手順1：帰化対象者ファイルのaddressIndexの「宛名番号」列の値を読み取り、配列化
         //配列の行の分だけループを回す
@@ -639,7 +684,7 @@ function taxinfo_naturalization_merge() {
         return output.join('\n');
     }
 
-}
+
 
 /* 13.課税対象の住民を除外する処理 */
 function ExcludedFromTaxation() {
