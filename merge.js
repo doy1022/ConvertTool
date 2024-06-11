@@ -1,7 +1,106 @@
 /* 定数定義 */
 const LOG_LEVEL = 'debug'; // Log出力のレベルを選択（debug, info, warn, error）
+const MIDDLE_FILE_0 = "中間ファイル⓪.csv";
 const MIDDLE_FILE_1 = "中間ファイル①.csv";
 const MIDDLE_FILE_2 = "中間ファイル②.csv";
+
+/* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
+function mergeTaxCSV() {
+    // 各ファイルのIDを配列に格納する
+    // 
+    const fileIds = ['LevyMaster', 'PersonalMaster'];
+    // 各ファイルのIDを配列に格納する
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 0 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    // 読み込んだファイル内データのマージをおこなう
+                    const mergedCSV = processCSV(...results);
+                    downloadCSV(mergedCSV, MIDDLE_FILE_0);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 0 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+
+    function processCSV(...csvFiles) {
+        // 各CSVファイルをヘッダーとデータ行に分解し、1行ずつ配列に格納する
+        const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
+        // 各ファイルヘッダー内の「ＦＩ－」を取り除く
+        parsedCSVs.forEach(parsed => parsed.header = removeStrFromHeader(parsed.header, "ＦＩ－"));
+        // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
+        const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('宛名番号'));
+
+        // 各CSVデータをマッピングしマージ処理を行う
+        const map = new Map();
+        parsedCSVs.forEach((parsed, fileIndex) => {
+            parsed.rows.forEach(row => {
+                const addressNumber = row[addressIndex[fileIndex]];
+                // headersとrowからオブジェクトを生成する
+                const rowObj = parsed.header.reduce((obj, header, i) => {
+                    obj[header] = row[i];
+                    return obj;
+                }, {});
+                map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
+            });
+        });
+
+        // 条件ごとに課税区分を入力する
+        map.forEach((value) => {
+            // 条件分岐に使用するカラムの値を定義する
+            const IncomePercentage = Number(value['所得割額']);
+            const EqualPercentage = Number(value['均等割額']);
+            const CauseForCorrection = String(value['更正事由']);
+            // ★★★★★★★★★条件の見直し必須、また、同名のカラムがあるはずなのでindex指定にしたい★★★★★★★★★
+            // 「均等割額」が0かつ「更正事由」の先頭２桁が03でないものを非課税(1)判定
+            if (IncomePercentage == 0 && EqualPercentage == 0 && !CauseForCorrection.startsWith("03")) {
+                value['課税区分'] = '1';
+                // 「均等割額」が0以上かつ「所得割額」が0かつ「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+            } else if (IncomePercentage == 0 && EqualPercentage > 0 && !CauseForCorrection.startsWith("03")) {
+                value['課税区分'] = '2';
+                // 「所得割額」が0以上かつ「更正事由」の先頭２桁が03でないものを課税(3)判定
+            } else if (IncomePercentage > 0 && EqualPercentage == 0 && !CauseForCorrection.startsWith("03")) {
+                value['課税区分'] = '3';
+            } else {
+                value['課税区分'] = '';
+            }
+        });
+
+        // アウトプットファイルのカラムを指定する
+        const selectedColumns = ['宛名番号', '所得割額', '均等割額', '課税区分', '更正事由', '生年月日'];
+        const outputHeader = selectedColumns.join(',');
+
+        const outputRows = [];
+        map.forEach(value => {
+            const row = selectedColumns.map(header => value[header] || '');
+            outputRows.push(row.join(','));
+        });
+
+        const output = [outputHeader, ...outputRows];
+        return output.join('\n');
+    }
+}
 
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
@@ -106,9 +205,9 @@ function handleFile() {
             const lines = text.split('\n').map(line => line.split(','));
             const headers = lines[0];
             const requiredColumns = [
-                '世帯員の人数', 
-                '消除日', 
-                '消除届出日', 
+                '世帯員の人数',
+                '消除日',
+                '消除届出日',
                 '消除事由コード'
             ];
             // カラムのインデックスを取得
@@ -117,7 +216,7 @@ function handleFile() {
             const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
             if (missingColumns.length > 0) {
-                throw new Error (`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+                throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
             }
 
             // 課税対象の住民を除外する処理
@@ -144,7 +243,7 @@ function handleFile() {
     reader.readAsText(files[0]);
 
     /* 死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理 */
-    function filterDeath(text,columnIndices) {
+    function filterDeath(text, columnIndices) {
         // ヘッダーとデータレコーダーに分割
         const { header, rows } = parseCSV(text);
 
