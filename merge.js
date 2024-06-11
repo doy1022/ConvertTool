@@ -3,6 +3,8 @@ const LOG_LEVEL = 'debug'; // Log出力のレベルを選択（debug, info, warn
 const MIDDLE_FILE_0 = "中間ファイル⓪.csv";
 const MIDDLE_FILE_1 = "中間ファイル①.csv";
 const MIDDLE_FILE_2 = "中間ファイル②.csv";
+const MIDDLE_FILE_3 = "中間ファイル③.csv";
+const MIDDLE_FILE_4 = "中間ファイル④.csv";
 
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
 function mergeTaxCSV() {
@@ -82,6 +84,9 @@ function mergeTaxCSV() {
                 // 「所得割額」が0以上かつ「更正事由」の先頭２桁が03でないものを課税(3)判定
             } else if (IncomePercentage > 0 && EqualPercentage == 0 && !CauseForCorrection.startsWith("03")) {
                 value['課税区分'] = '3';
+                // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
+            } else if (CauseForCorrection.startsWith("03")) {
+                value['課税区分'] = '4';
             } else {
                 value['課税区分'] = '';
             }
@@ -181,7 +186,7 @@ function mergeCSV() {
     }
 }
 
-/* 2.課税対象の住民を除外する処理 */
+/* 2.課税対象の住民を除外する処理・消除者を除外する処理・住民日がR6.6.4~の住民を除外する処理 */
 function handleFile() {
     // 各ファイルのIDを配列に格納する
     const fileIds = ['midFile1'];
@@ -263,75 +268,170 @@ function handleFile() {
 }
 /* 
 
-/* 4.R5給付対象者を、宛名番号をキーとして除外する処理 */
+/* 3.R5給付対象者を、宛名番号・世帯番号をキーとして除外する処理 */
 function deleteRowsByAddressNumber() {
-    processTwoFiles('file5', 'file6', (csv1, csv2) => deleteRows(csv1, csv2, '宛名番号'), '中間ファイル④.csv');
-}
-
-function deleteRows(csvText1, csvText2, key) {
-    // CSVテキストを行ごとに分割して配列に変換
-    const lines1 = csvText1.split('\n').map(line => line.split(','));
-    const lines2 = csvText2.split('\n').map(line => line.split(','));
-    // ヘッダー行を取得
-    const headers1 = lines1[0];
-    const headers2 = lines2[0];
-    // 必要な列のインデックスを取得
-    const index1 = headers1.indexOf(key);
-    const index2 = headers2.indexOf(key);
-    // 宛名番号が見つからない場合のエラーハンドリング
-    if (index1 === -1 || index2 === -1) {
-        alert(`${key}列が見つかりません。`);
-        return;
+    const fileIds = ['file5', 'file6'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
     }
 
-    // 2つ目のCSVファイルの宛名番号のセットを作成
-    const keySet = new Set(lines2.slice(1).map(line => line[index2].trim()));
-    // 宛名番号がセットに含まれていない行をフィルタリング
-    const filteredLines = lines1.filter((line, index) => index === 0 || !keySet.has(line[index1].trim()));
-    // フィルタリングされた行をCSV形式に戻す
-    return filteredLines.map(line => line.join(',')).join('\n');
-}
+    logger.info('STEP 3 処理を開始しました');
 
-/* 5.廃止事由ファイル内「廃止理由」が「18(他区課税)」の行を除外する処理 */
-function deleteRowsByReason() {
-    processTwoFiles('file7', 'file8', (csv1, csv2) => filterByReason(csv1, csv2), '中間ファイル⑤.csv');
-}
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
 
-function filterByReason(csvText1, csvText2) {
-    // CSVテキストを行ごとに分割して配列に変換
-    const lines1 = csvText1.split('\n').map(line => line.split(','));
-    const lines2 = csvText2.split('\n').map(line => line.split(','));
-    // ヘッダー行を取得
-    const headers1 = lines1[0];
-    const headers2 = lines2[0];
-    // 必要な列のインデックスを取得
-    const index1 = headers1.indexOf('宛名番号');
-    const index2 = headers2.indexOf('宛名番号');
-    const reasonIndex = headers2.indexOf('廃止理由');
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
 
-    // インデックスが見つからない場合のエラーハンドリング
-    if (index1 === -1 || index2 === -1 || reasonIndex === -1) {
-        alert('宛名番号または廃止理由列が見つかりません。');
-        return '';
-    }
-
-    // 廃止理由が'18'である行の宛名番号をセットに格納
-    const keySet = new Set();
-    for (let i = 1; i < lines2.length; i++) {
-        const line = lines2[i];
-        if (line[reasonIndex].trim() === '18') {
-            keySet.add(line[index2].trim());
-        }
-    }
-
-    // 宛名番号がセットに含まれていない行をフィルタリング
-    const filteredLines = lines1.filter((line, index) => {
-        if (index === 0) return true; // ヘッダー行はそのまま残す
-        return !keySet.has(line[index1].trim());
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    const mergedCSV = deleteRows(results[0], results[1], ['宛名番号', '世帯番号']);
+                    downloadCSV(mergedCSV, MIDDLE_FILE_3);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 3 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
     });
 
-    // フィルタリングされた行をCSV形式に戻す
-    return filteredLines.map(line => line.join(',')).join('\n');
+    function deleteRows(csvText1, csvText2, keys) {
+        // CSVテキストを行ごとに分割して配列に変換
+        const lines1 = csvText1.split('\n').map(line => line.split(','));
+        const lines2 = csvText2.split('\n').map(line => line.split(','));
+
+        // ヘッダー行を取得
+        const headers1 = lines1[0];
+        const headers2 = lines2[0];
+
+        // 各キーのインデックスを取得
+        const index1_1 = headers1.indexOf(keys[0]); // 宛名番号のインデックス（ファイル1）
+        const index1_2 = headers1.indexOf(keys[1]); // 世帯番号のインデックス（ファイル1）
+        const index2_1 = headers2.indexOf(keys[0]); // 宛名番号のインデックス（ファイル2）
+        const index2_2 = headers2.indexOf(keys[1]); // 世帯番号のインデックス（ファイル2])
+
+        // 必要なキーが見つからない場合のエラーハンドリング
+        if (index1_1 === -1 || index1_2 === -1 || index2_1 === -1 || index2_2 === -1) {
+            logger.error('宛名番号または世帯番号列が見つかりません。');
+            return '';
+        }
+
+        // 2つ目のCSVファイルの宛名番号と世帯番号のセットを作成
+        const addressNumberSet = new Set(lines2.slice(1).map(line => line[index2_1].trim()));
+        const householdNumberSet = new Set(lines2.slice(1).map(line => line[index2_2].trim()));
+
+        // 宛名番号または世帯番号がセットに含まれていない行をフィルタリング
+        const filteredLines = lines1.filter((line, index) => {
+            if (index === 0) return true; // ヘッダー行はそのまま残す
+            const addressNumber = line[index1_1].trim();
+            const householdNumber = line[index1_2].trim();
+            return !(addressNumberSet.has(addressNumber) || householdNumberSet.has(householdNumber));
+        });
+
+        // フィルタリングされた行をCSV形式に戻す
+        return filteredLines.map(line => line.join(',')).join('\n');
+    }
+}
+
+/* 4.廃止事由ファイル内「廃止理由」が「18(他区課税)」の行を除外する処理 */
+function deleteRowsByReason() {
+    const fileIds = ['file7', 'file8'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    logger.info('STEP 4 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    const mergedCSV = filterByReason(results[0], results[1]);
+                    downloadCSV(mergedCSV, MIDDLE_FILE_4);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 4 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+
+    function filterByReason(csvText1, csvText2) {
+        // CSVテキストを行ごとに分割して配列に変換
+        const lines1 = csvText1.split('\n').map(line => line.split(','));
+        const lines2 = csvText2.split('\n').map(line => line.split(','));
+        // ヘッダー行を取得
+        const headers1 = lines1[0];
+        const headers2 = lines2[0];
+        // 必要な列のインデックスを取得
+        const index1 = headers1.indexOf('宛名番号');
+        const index2 = headers2.indexOf('宛名番号');
+        const reasonIndex = headers2.indexOf('廃止理由');
+
+        // インデックスが見つからない場合のエラーハンドリング
+        if (index1 === -1 || index2 === -1 || reasonIndex === -1) {
+            logger.error('宛名番号または廃止理由列が見つかりません。');
+            return '';
+        }
+
+        // 廃止理由が'18'である行の宛名番号をセットに格納
+        const keySet = new Set();
+
+        // lines2の各行をループ処理（最初の行はヘッダーなのでスキップ）
+        for (let i = 1; i < lines2.length; i++) {
+            const line = lines2[i];
+
+            // 該当行の廃止理由を取得し、トリムしてチェック
+            const reason = line[reasonIndex].trim();
+            if (reason === '18') {
+                // 廃止理由が'18'なら、その行の宛名番号をセットに追加
+                const key = line[index2].trim();
+                keySet.add(key);
+            }
+        }
+
+        // フィルタリングされた行を格納するための配列を初期化
+        const filteredLines = [];
+
+        // lines1の各行をループ処理
+        for (let i = 0; i < lines1.length; i++) {
+            const line = lines1[i];
+
+            // ヘッダー行（最初の行）はそのまま追加
+            if (i === 0) {
+                filteredLines.push(line);
+            } else {
+                // 該当行の宛名番号を取得し、トリムしてチェック
+                const key = line[index1].trim();
+                // keySetに含まれていない行だけを追加
+                if (!keySet.has(key)) {
+                    filteredLines.push(line);
+                }
+            }
+        }
+        // フィルタリングされた行をCSV形式に戻す
+        return filteredLines.map(line => line.join(',')).join('\n');
+    }
 }
 
 /* 6.「課税区分」に値がある行を除外する（＝税情報無しの住民を抽出する）処理 */
@@ -938,8 +1038,8 @@ function filterTaxExcluded(text) {
     if (headerIndex === -1) {
         throw ('課税区分列が見つかりません。');
     }
-    // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が「課税対象」ではない行を抽出する
-    const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] !== '課税対象');
+    // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が「3（課税判定）」ではない行を抽出する
+    const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] !== '3');
     // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
     return filteredLines.map(line => line.join(',')).join('\n');
 }
