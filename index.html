@@ -9,6 +9,15 @@
 
 <body>
     <div class="tools-container">
+        <h1>0.賦課マスタ・個人基本マスタをマージする</h1>
+        <form id="csvForm0">
+            <label for="LevyMaster">賦課マスタをアップロードして下さい:</label>
+            <input type="file" id="LevyMaster" accept=".csv"><br><br>
+            <label for="PersonalMaster">個人基本マスタをアップロードして下さい:</label>
+            <input type="file" id="PersonalMaster" accept=".csv"><br><br>
+            <button type="button" onclick="mergeTaxCSV()">中間ファイル⓪を作成する</button>
+        </form>
+
         <h1>1.住基情報・税情報・住民票コード・前住所地の住所コードを、宛名番号をキーにしてマージする</h1>
         <form id="csvForm1">
             <label for="file1">住基情報ファイルをアップロードして下さい:</label>
