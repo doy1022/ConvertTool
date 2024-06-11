@@ -1087,6 +1087,23 @@ function parseCSV(text) {
     return { header: header, rows: rows.map(row => row) };
 }
 
+/**
+ * 現在時刻を取得する
+ * @return {String} YYYY-MM-dd HH:mm:ss.sss
+ */
+function getCurrentTime() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+}
+
 /* 使いまわすメソッド（汎用処理）ここまで */
 
 // ログ出力クラス
@@ -1097,23 +1114,10 @@ class Logger {
         this.logContainer = document.getElementById(logContainerId);
     }
 
-    // 現在時刻を取得
-    getCurrentTime() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-
-        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    }
-
     // ログレベル・時刻・メッセージを結合
     log(level, message) {
         if (this.levels.indexOf(level) >= this.levels.indexOf(this.level)) {
-            const timestamp = this.getCurrentTime();
+            const timestamp = getCurrentTime();
             const logMessage = `[${timestamp}] [${level.toUpperCase()}] \n${message}`;
             this.appendLog(logMessage, level);
         }
