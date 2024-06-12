@@ -6,6 +6,7 @@ const MIDDLE_FILE_2 = "中間ファイル②.csv";
 const MIDDLE_FILE_3 = "中間ファイル③.csv";
 const MIDDLE_FILE_4 = "中間ファイル④.csv";
 const MIDDLE_FILE_5 = "中間ファイル⑤.csv";
+const NO_TAXINFO_FILE = "「税情報なし」対象者.DAT";
 
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
 function mergeTaxCSV() {
@@ -490,9 +491,8 @@ function ChangeRowsFromInstitutionCode() {
     }
 }
 
-// todo 作成中
 /* 6.①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外 ④税情報照会用ファイル（固定長形式）を出力する処理 */
-function deleteRowsWithAssessment() {
+function deleteRowAndGenerateInquiryFile() {
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file9'];
     const { check, file_num, files } = fileCheck(fileIds);
@@ -530,15 +530,13 @@ function deleteRowsWithAssessment() {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
             }
 
-            // ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外（一つのfunctionにまとめました）
-            const filterTaxExcludedText = filterTaxExcluded(text);
-            if (!filterTaxExcludedText) {
+            // ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外（一つのfunctionにまとめています）
+            const filteredText = FilterTaxAndAddressAndMovementReason(text, columnIndices);
+            if (!filteredText) {
                 logger.warn("出力対象レコードが存在しませんでした。");
             } else {
-                // 全処理完了後にCSVアウトプット
-                downloadCSV(filterDeathText, MIDDLE_FILE_2);
-
-            }
+                 downloadCSV(filteredText, NO_TAXINFO_FILE);
+                }
         } catch (error) {
             // catchしたエラーを表示
             logger.error(error);
@@ -549,59 +547,37 @@ function deleteRowsWithAssessment() {
     // onloadイベントを発火
     reader.readAsText(files[0]);
 
-    /* ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理 */
-    function filterDeath(text, columnIndices) {
+/* ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理 */
+    function FilterTaxAndAddressAndMovementReason(text, columnIndices) {
         // ヘッダーとデータレコーダーに分割
         const { header, rows } = parseCSV(text);
+        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
 
         // 条件に合致するレコードのみをフィルタ
         const filteredLines = rows.filter(line => {
-            const [members, removalDate, notificationDate, reasonCode] = [
-                line[columnIndices[0]],
-                line[columnIndices[1]],
+            const [TaxClassification, PreviousAddressCode, changeReasonCode] = [
                 line[columnIndices[2]],
-                line[columnIndices[3]]
+                line[columnIndices[3]],
+                line[columnIndices[4]]
             ];
-            return !(members === '1' && removalDate && notificationDate && reasonCode);
+            return (TaxClassification == '' && PreviousAddressCode !== '99999' && !validCodes.includes(changeReasonCode));
         });
-
-        return [header.join(','), ...filteredLines.map(line => line.join(','))].join('\n');
+        // generateFixedLengthFileにテキストを渡し、中間サーバに連携する向けにファイル形式を整える
+        return generateFixedLengthFile([header.join(','), ...filteredLines.map(line => line.join(','))].join('\n'));
     }
-
 }
 
-/* 6.「課税区分」に値がある行を除外する（＝税情報無しの住民を抽出する）処理 */
-function deleteRowsWithAssessment() {
-    processSingleFile('file9', text => {
-        const lines = text.split('\n').map(line => line.split(','));
-        const headers = lines[0];
-        const assessmentIndex = headers.indexOf('課税区分');
-        if (assessmentIndex === -1) {
-            alert('課税区分列が見つかりません。');
-            return;
-        }
-        const filteredLines = lines.filter((line, index) => index === 0 || !line[assessmentIndex].trim());
-        // 
-        return generateFixedLengthFile(filteredLines.map(line => line.join(',')).join('\n'));
-    }, '「税情報なし」対象者.csv');
-}
-
-
-/* 8. 税情報照会用ファイル（固定長形式）を出力する処理 */
-function generateTaxInfoInquiryFile() {
-    processSingleFile('file10', generateFixedLengthFile, '「税情報なし」対象者.csv');
-}
-
-// 中間サーバ照会用のファイルを作成する処理（ステップ15でも使用するため、別functionとして作成した）
+// 中間サーバ照会用のファイルを作成する処理（他ステップでも使用するため、Globalのfunctionとして作成した）
 function generateFixedLengthFile(text) {
     const lines = text.split('\n').map(line => line.split(','));
     const headers = lines[0];
+    const TooluseTime = getCurrentTime().replace(/[:.\-\s]/g, '').trim();
 
     // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
     const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
     const column2 = { length: 15, name: '宛名番号', padding: '0' };
     const column3 = { length: 15, name: '統合宛名番号', padding: '' };
-    const column4 = { length: 17, name: '照会依頼日時' };
+    const column4 = { length: 17, name: '照会依頼日時', value: TooluseTime };
     const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
     const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
     const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
