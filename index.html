@@ -63,20 +63,20 @@
             <button type="button" onclick="deleteRowsByReason()">中間ファイル⑤を作成する</button>
         </form>
 
-        <h1>6.「課税区分」に値が入っている（税情報がある）住民を除外し、税情報無し対象者ファイルを作成する</h1>
-        <form id="csvForm6">
-            <label for="file9">中間ファイル⑤をアップロードして下さい:</label>
-            <input type="file" id="file9" accept=".csv"><br><br>
-            <button type="button" onclick="deleteRowsWithAssessment()">中間ファイル⑥を作成する</button>
-        </form>
-
-        <h1>7. 「転入元都道府県市区町村コード」の値を「情報提供者機関コード」に変換する</h1>
+        <h1>5. 「転入元都道府県市区町村コード」の値を「情報提供者機関コード」に変換する</h1>
         <form id="csvForm8">
             <label for="file11">中間ファイル⑥をアップロードしてください:</label>
             <input type="file" id="file11" accept=".csv"><br><br>
             <label for="file12">機関コードファイルをアップロードしてください:</label>
             <input type="file" id="file12" accept=".csv"><br><br>
             <button type="button" onclick="ChangeRowsFromInstitutionCode()">中間ファイル⑦を作成する</button>
+        </form>
+
+        <h1>6.「課税区分」に値が入っている（税情報がある）住民を除外し、税情報無し対象者ファイルを作成する</h1>
+        <form id="csvForm6">
+            <label for="file9">中間ファイル⑤をアップロードして下さい:</label>
+            <input type="file" id="file9" accept=".csv"><br><br>
+            <button type="button" onclick="deleteRowsWithAssessment()">中間ファイル⑥を作成する</button>
         </form>
 
         <h1>8.抽出した税情報無しの住民リストを、照会ファイルのフォーマットに整える</h1>
