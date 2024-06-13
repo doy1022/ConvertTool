@@ -771,7 +771,7 @@ function generateNaturalizedCitizenFile() {
         // ヘッダーとデータレコーダーに分割
         const { header, rows } = parseCSV(text);
         const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
-        // 出力用のヘッダーを定義する（長いので）
+        // 出力用のヘッダーを定義する
         const OutputHeader = [
             '宛名番号',
             '世帯番号',
@@ -825,8 +825,6 @@ function generateNaturalizedCitizenFile() {
         return [OutputHeader.join(','), ...selectedLines.map(line => line.join(','))].join('\n');
     }
 }
-
-
 
 
 
