@@ -616,6 +616,82 @@ function generateFixedLengthFile(text) {
 /* 9. 住基照会用ファイル①を出力する処理 */
 /* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
 function generateReferencingFile1() {
+    // 各ファイルのIDを配列に格納する
+    const fileIds = ['file13'];
+    // 各ファイルのIDを配列に格納する
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 9 処理を開始しました');
+
+    // 読み込んだデータをresults配列の対応する位置に保存する
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+            let text = e.target.result;
+
+            // 必要なヘッダーがあるかチェック
+            const lines = text.split('\n').map(line => line.split(','));
+            const headers = lines[0];
+            const requiredColumns = [
+                '宛名番号',
+                '住民票コード',
+                '転入元都道府県市区町村コード',
+            ];
+            // カラムのインデックスを取得
+            const columnIndices = requiredColumns.map(col => headers.indexOf(col));
+            // 足りないカラムをチェック
+            const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+            if (missingColumns.length > 0) {
+                throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+            }
+
+            // 課税対象の住民を除外する処理
+            const filterTaxExcludedText = filterTaxExcluded(text);
+            if (!filterTaxExcludedText) {
+                logger.warn("出力対象レコードが存在しませんでした。");
+                } else {
+                    downloadCSV(filterDeathText, MIDDLE_FILE_2);
+            }
+        } catch (error) {
+            // catchしたエラーを表示
+            logger.error(error);
+        } finally {
+            logger.info('STEP 9 処理を終了しました');
+        }
+    };
+    // onloadイベントを発火
+    reader.readAsText(files[0]);
+
+    /* 死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理 */
+    function filterDeath(text, columnIndices) {
+        // ヘッダーとデータレコーダーに分割
+        const { header, rows } = parseCSV(text);
+
+        // 条件に合致するレコードのみをフィルタ
+        const filteredLines = rows.filter(line => {
+            const [members, removalDate, notificationDate, reasonCode] = [
+                line[columnIndices[0]],
+                line[columnIndices[1]],
+                line[columnIndices[2]],
+                line[columnIndices[3]]
+            ];
+            return !(members === '1' && removalDate && notificationDate && reasonCode);
+        });
+
+        return [header.join(','), ...filteredLines.map(line => line.join(','))].join('\n');
+    }
+}
+
+
+/* 9. 住基照会用ファイル①を出力する処理 */
+/* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
+function generateReferencingFile1() {
     // CSVの数が1つの時の汎用処理を呼び出す（引数：①CSVファイルのID ②コールバック関数 ③出力するファイル名）
     processSingleFile('file13', text => {
         const lines = text.split('\n').map(line => line.split(','));
