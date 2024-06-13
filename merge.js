@@ -7,6 +7,8 @@ const MIDDLE_FILE_3 = "中間ファイル③.csv";
 const MIDDLE_FILE_4 = "中間ファイル④.csv";
 const MIDDLE_FILE_5 = "中間ファイル⑤.csv";
 const NO_TAXINFO_FILE = "「税情報なし」対象者.DAT";
+const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
+const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
 
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
 function mergeTaxCSV() {
@@ -77,15 +79,18 @@ function mergeTaxCSV() {
             const EqualPercentage = Number(value['均等割額']);
             const CauseForCorrection = String(value['更正事由']);
             // ★★★★★★★★★条件の見直し必須、また、同名のカラムがあるはずなのでindex指定にしたい★★★★★★★★★
-            // 「均等割額」が0かつ「更正事由」の先頭２桁が03でないものを非課税(1)判定
+            // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
             if (IncomePercentage == 0 && EqualPercentage == 0 && !CauseForCorrection.startsWith("03")) {
                 value['課税区分'] = '1';
-                // 「均等割額」が1以上かつ「所得割額」が0かつ「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+                // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
             } else if (IncomePercentage == 0 && EqualPercentage > 0 && !CauseForCorrection.startsWith("03")) {
                 value['課税区分'] = '2';
-                // 「所得割額」が1以上かつ「更正事由」の先頭２桁が03でないものを課税(3)判定
-            } else if (IncomePercentage > 0 && EqualPercentage == 0 && !CauseForCorrection.startsWith("03")) {
+                // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
+            } else if (IncomePercentage > 0 && EqualPercentage > 0 && !CauseForCorrection.startsWith("03")) {
                 value['課税区分'] = '3';
+                // 「所得割額」が1以上のときは「均等割額」が1以上になるはずのため、「均等割額」が0のものはエラーとして投げる
+            } else if (IncomePercentage > 0 && EqualPercentage == 0 && !CauseForCorrection.startsWith("03")) {
+                throw new Error('【宛名番号：' + String(value['宛名番号']) + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
                 // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
             } else if (CauseForCorrection.startsWith("03")) {
                 value['課税区分'] = '4';
@@ -535,8 +540,8 @@ function deleteRowAndGenerateInquiryFile() {
             if (!filteredText) {
                 logger.warn("出力対象レコードが存在しませんでした。");
             } else {
-                 downloadCSV(filteredText, NO_TAXINFO_FILE);
-                }
+                downloadCSV(filteredText, NO_TAXINFO_FILE);
+            }
         } catch (error) {
             // catchしたエラーを表示
             logger.error(error);
@@ -547,7 +552,7 @@ function deleteRowAndGenerateInquiryFile() {
     // onloadイベントを発火
     reader.readAsText(files[0]);
 
-/* ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理 */
+    /* ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理 */
     function FilterTaxAndAddressAndMovementReason(text, columnIndices) {
         // ヘッダーとデータレコーダーに分割
         const { header, rows } = parseCSV(text);
@@ -567,7 +572,7 @@ function deleteRowAndGenerateInquiryFile() {
     }
 }
 
-// 中間サーバ照会用のファイルを作成する処理（他ステップでも使用するため、Globalのfunctionとして作成した）
+// 中間サーバ照会用のファイルを作成する処理（他ステップでも使用する予定のため、Globalのfunctionとして作成した）
 function generateFixedLengthFile(text) {
     const lines = text.split('\n').map(line => line.split(','));
     const headers = lines[0];
@@ -613,19 +618,16 @@ function generateFixedLengthFile(text) {
     }).join('\n');
 }
 
-/* 9. 住基照会用ファイル①を出力する処理 */
+/* 7. 住基照会用ファイル①を出力する処理 */
 /* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
 function generateReferencingFile1() {
-    // 各ファイルのIDを配列に格納する
     const fileIds = ['file13'];
-    // 各ファイルのIDを配列に格納する
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
     }
 
-    // 処理開始log
-    logger.info('STEP 9 処理を開始しました');
+    logger.info('STEP 7 処理を開始しました');
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -640,7 +642,8 @@ function generateReferencingFile1() {
             const requiredColumns = [
                 '宛名番号',
                 '住民票コード',
-                '転入元都道府県市区町村コード',
+                '異動事由コード',
+                '転入元都道府県市区町村コード'
             ];
             // カラムのインデックスを取得
             const columnIndices = requiredColumns.map(col => headers.indexOf(col));
@@ -651,151 +654,181 @@ function generateReferencingFile1() {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
             }
 
-            // 課税対象の住民を除外する処理
-            const filterTaxExcludedText = filterTaxExcluded(text);
-            if (!filterTaxExcludedText) {
+            const filterPreviousPrefectCodeText = filterPreviousPrefectCode(text, columnIndices);
+            if (!filterPreviousPrefectCodeText) {
                 logger.warn("出力対象レコードが存在しませんでした。");
-                } else {
-                    downloadCSV(filterDeathText, MIDDLE_FILE_2);
+            } else {
+                downloadCSV(filterPreviousPrefectCodeText, RESIDENTINFO_INQUIRY_FILE_1);
             }
         } catch (error) {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 9 処理を終了しました');
+            logger.info('STEP 7 処理を終了しました');
         }
     };
     // onloadイベントを発火
     reader.readAsText(files[0]);
 
-    /* 死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理 */
-    function filterDeath(text, columnIndices) {
+    /* 転入元都道府県市区町村コードが「99999」かつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれでもない住民を抽出し、ファイル形式を整える */
+    function filterPreviousPrefectCode(text, columnIndices) {
         // ヘッダーとデータレコーダーに分割
         const { header, rows } = parseCSV(text);
+        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
 
-        // 条件に合致するレコードのみをフィルタ
+        // 条件に合致するレコードのみをフィルタする
         const filteredLines = rows.filter(line => {
-            const [members, removalDate, notificationDate, reasonCode] = [
-                line[columnIndices[0]],
-                line[columnIndices[1]],
+            const [changeReasonCode, PreviousAddressCode] = [
                 line[columnIndices[2]],
                 line[columnIndices[3]]
             ];
-            return !(members === '1' && removalDate && notificationDate && reasonCode);
+            return (!validCodes.includes(changeReasonCode) && PreviousAddressCode == '99999');
         });
 
-        return [header.join(','), ...filteredLines.map(line => line.join(','))].join('\n');
+        // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出する
+        const selectedLines = filteredLines.map(line => [
+            line[columnIndices[0]],  // 宛名番号列
+            line[columnIndices[1]]   // 住民票コード列
+        ]);
+
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+        return [['宛名番号', '住民票コード'].join(','), ...selectedLines.map(line => line.join(','))].join('\n');
+    }
+}
+
+/* 8. 帰化対象者をファイルを出力する処理 */
+function generateNaturalizedCitizenFile() {
+    // 各ファイルのIDを配列に格納する
+    const fileIds = ['file14'];
+    // 各ファイルのIDを配列に格納する
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 8 処理を開始しました');
+
+    // 読み込んだデータをresults配列の対応する位置に保存する
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+            let text = e.target.result;
+
+            // 必要なヘッダーがあるかチェック
+            const lines = text.split('\n').map(line => line.split(','));
+            const headers = lines[0];
+            const requiredColumns = [
+                // 以下、ファイル作成用に必要なカラム
+                '宛名番号',
+                '世帯番号',
+                'カナ氏名',
+                '漢字氏名',
+                '生年月日',
+                '性別',
+                '届出日',
+                '異動日',
+                '異動事由コード', //このカラムは、抽出判定時にもファイル作成時にも使用する
+                '住民日',
+                '住民届出日',
+                '住民事由コード',
+                '現住所住定日',
+                '現住所届出日',
+                '消除日',
+                '消除届出日',
+                '消除事由コード',
+                // 以下、除外の判定のために必要なカラム（99999であれば除外する用）
+                '転入元都道府県市区町村コード'
+            ];
+            // カラムのインデックスを取得
+            const columnIndices = requiredColumns.map(col => headers.indexOf(col));
+            // 足りないカラムをチェック
+            const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+            if (missingColumns.length > 0) {
+                throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+            }
+
+            const filterNaturalizedCitizenText = filterChangeReasonCode(text, columnIndices);
+            if (!filterNaturalizedCitizenText) {
+                logger.warn("出力対象レコードが存在しませんでした。");
+            } else {
+                downloadCSV(filterNaturalizedCitizenText, NATURALIZED_CITIZEN_FILE);
+            }
+        } catch (error) {
+            // catchしたエラーを表示
+            logger.error(error);
+        } finally {
+            logger.info('STEP 8 処理を終了しました');
+        }
+    };
+    // onloadイベントを発火
+    reader.readAsText(files[0]);
+
+    /* 転入元都道府県市区町村コードが「99999」ではないかつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれかの住民を抽出し、ファイル形式を整える */
+    function filterChangeReasonCode(text, columnIndices) {
+        // ヘッダーとデータレコーダーに分割
+        const { header, rows } = parseCSV(text);
+        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
+        // 出力用のヘッダーを定義する（長いので）
+        const OutputHeader = [
+            '宛名番号',
+            '世帯番号',
+            'カナ氏名',
+            '漢字氏名',
+            '生年月日',
+            '性別',
+            '届出日',
+            '異動日',
+            '異動事由コード',
+            '住民日',
+            '住民届出日',
+            '住民事由コード',
+            '現住所住定日',
+            '現住所届出日',
+            '消除日',
+            '消除届出日',
+            '消除事由コード',
+        ];
+
+        // 条件に合致する行を抽出する
+        const filteredLines = rows.filter(line => {
+            const [changeReasonCode, PreviousAddressCode] = [
+                line[columnIndices[8]],
+                line[columnIndices[17]]
+            ];
+            return (validCodes.includes(changeReasonCode) && PreviousAddressCode !== '99999');
+        });
+
+        // フィルタリングされた行から、必要なカラムのデータのみを抽出する
+        const selectedLines = filteredLines.map(line => [
+            line[columnIndices[0]],
+            line[columnIndices[1]],
+            line[columnIndices[2]],
+            line[columnIndices[3]],
+            line[columnIndices[4]],
+            line[columnIndices[5]],
+            line[columnIndices[6]],
+            line[columnIndices[7]],
+            line[columnIndices[8]],
+            line[columnIndices[9]],
+            line[columnIndices[10]],
+            line[columnIndices[11]],
+            line[columnIndices[12]],
+            line[columnIndices[13]],
+            line[columnIndices[14]],
+            line[columnIndices[15]],
+            line[columnIndices[16]]
+        ]);
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+        return [OutputHeader.join(','), ...selectedLines.map(line => line.join(','))].join('\n');
     }
 }
 
 
-/* 9. 住基照会用ファイル①を出力する処理 */
-/* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
-function generateReferencingFile1() {
-    // CSVの数が1つの時の汎用処理を呼び出す（引数：①CSVファイルのID ②コールバック関数 ③出力するファイル名）
-    processSingleFile('file13', text => {
-        const lines = text.split('\n').map(line => line.split(','));
-        const header = lines[0];
-        const headerIndex = header.indexOf('転入元都道府県市区町村コード');
 
-        if (headerIndex === -1) {
-            alert('転入元都道府県市区町村コード列が見つかりません。');
-            return;
-        }
 
-        // 「宛名番号」と「住民票コード」のインデックスを取得
-        const indexA = header.indexOf('宛名番号');
-        const indexB = header.indexOf('住民票コード');
-
-        if (indexA === -1 || indexB === -1) {
-            alert('宛名番号または住民票コード列が見つかりません。');
-            return;
-        }
-
-        // filter処理を実施し、indexが0（要するにヘッダー行）と、「転入元都道府県市区町村コード」が「99999」である行をフィルタリング
-        const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] == '99999');
-        // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出
-        const extractedLines = filteredLines.map(line => [line[indexA], line[indexB]]);
-        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return extractedLines.map(line => line.join(',')).join('\n');
-    }, '住基照会用ファイル①.csv');
-}
-
-/* 10. 帰化対象者を抽出する処理 */
-/* 住基情報の「ＦＯ－異動事由コード」（この処理が回るころには項目名から「ＦＯ－」が消えている想定）が特定のコードである住民を抽出する */
-function generateNaturalizedCitizenFile() {
-    // CSVファイルを解析する関数を呼び出す（引数：CSVファイルのID、コールバック関数、出力するファイル名）
-    processSingleFile('file14', function (text) {
-        // CSVファイルの内容を行ごとに分割し、さらに各行をカンマで区切る
-        const lines = text.split('\n').map(line => line.split(','));
-        // ヘッダー行（最初の行）を取得する
-        const header = lines[0];
-
-        // アウトプット用のカラムを個別に定義する。プロパティで新しい項目名、マッピングされる旧項目名を入力する
-        const column1 = { newName: '宛名番号', oldName: '宛名番号' };
-        const column2 = { newName: '世帯番号', oldName: '世帯番号' };
-        const column3 = { newName: 'カナ氏名', oldName: 'カナ氏名' };
-        const column4 = { newName: '漢字氏名', oldName: '漢字氏名' };
-        const column5 = { newName: '生年月日', oldName: '生年月日' };
-        const column6 = { newName: '性別', oldName: '性別' };
-        const column7 = { newName: '届出日', oldName: '届出日' };
-        const column8 = { newName: '異動日', oldName: '異動日' };
-        const column9 = { newName: '異動事由コード', oldName: '異動事由コード' };
-        const column10 = { newName: '住民日', oldName: '住民日' };
-        const column11 = { newName: '住民届出日', oldName: '住民届出日' };
-        const column12 = { newName: '住民事由コード', oldName: '住民事由コード' };
-        const column13 = { newName: '現住所住定日', oldName: '現住所住定日' };
-        const column14 = { newName: '現住所届出日', oldName: '現住所届出日' };
-        const column15 = { newName: '消除日', oldName: '消除日' };
-        const column16 = { newName: '消除届出日', oldName: '消除届出日' };
-        const column17 = { newName: '消除事由コード', oldName: '消除事由コード' };
-
-        // 全カラムを配列にまとめる（ここで順番も決める）
-        const columnMapping = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
-            column10, column11, column12, column13, column14, column15, column16, column17];
-
-        // 各既存カラムのインデックスを取得する
-        const indexMapping = columnMapping.map(col => ({
-            newName: col.newName,
-            index: header.indexOf(col.oldName)
-        }));
-
-        // 必要なカラムが存在するか確認する
-        for (const col of indexMapping) {
-            if (col.index === -1) {
-                alert(`${col.newName}に対応するカラム「${col.oldName}」が見つかりません。`);
-                return;
-            }
-        }
-
-        // フィルタ条件に合う異動事由コードのリストを定義する
-        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
-
-        // 条件に合う行を抽出する（ヘッダー行と有効な異動事由コードを含む行）
-        const filteredLines = lines.filter((line, index) => {
-            if (index === 0) {
-                return true; // ヘッダー行を残す
-            }
-            const code = line[indexMapping.find(col => col.newName === '異動事由コード').index];
-            return validCodes.includes(code);
-        });
-
-        // 新しいカラム名とそれに対応する既存のカラムの値をマッピングして出力
-        const outputLines = filteredLines.map((line, index) => {
-            if (index === 0) {
-                // ヘッダー行を新しいカラム名に変換
-                return columnMapping.map(col => col.newName);
-            } else {
-                // データ行を新しいカラム順に変換
-                return indexMapping.map(col => line[col.index]);
-            }
-        });
-
-        // 最終的なCSVデータを作成する
-        const outputCsv = outputLines.map(line => line.join(',')).join('\n');
-        return outputCsv;
-    }, '帰化対象者.csv');
-}
 
 /* 11. 税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルの値によって課税/非課税か更新をかける処理 */
 function updateFukaByAtenaNumber() {

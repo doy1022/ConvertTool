@@ -72,7 +72,7 @@
             <button type="button" onclick="ChangeRowsFromInstitutionCode()">中間ファイル⑦を作成する</button>
         </form>
 
-        <h1>6.「課税区分」に値が入っている（税情報がある）住民を除外し、税情報無し対象者ファイルを作成する</h1>
+        <h1>6.中間サーバに連携する「税情報無し対象者ファイル」を作成する</h1>
         <form id="csvForm6">
             <label for="file9">中間ファイル⑤をアップロードして下さい:</label>
             <input type="file" id="file9" accept=".csv"><br><br>
@@ -86,14 +86,14 @@
             <button type="button" onclick="generateTaxInfoInquiryFile()">税情報照会ファイルを作成する</button>
         </form>-->
 
-        <h1>9.住基照会用ファイル①（前住所地が国外である住民のリスト）を作成する</h1>
+        <h1>7.住基照会用ファイル①を作成する</h1>
         <form id="csvForm9">
             <label for="file13">中間ファイル⑤をアップロードしてください:</label>
             <input type="file" id="file13" accept=".csv"><br><br>
             <button type="button" onclick="generateReferencingFile1()">住基照会用ファイル①を作成する</button>
         </form>
 
-        <h1>10.帰化対象者リスト（住基情報の「ＦＯ－異動事由コード」がA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれかである住民のリスト）を作成する</h1>
+        <h1>8.帰化対象者リストを作成する</h1>
         <form id="csvForm10">
             <label for="file14">中間ファイル⑤をアップロードしてください:</label>
             <input type="file" id="file14" accept=".csv"><br><br>
