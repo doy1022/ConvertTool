@@ -220,7 +220,8 @@ function handleFile() {
                 '消除日',
                 '消除届出日',
                 '消除事由コード',
-                '住民日'
+                '住民日',
+                '宛名番号'
             ];
             // カラムのインデックスを取得
             const columnIndices = requiredColumns.map(col => header.indexOf(col));
@@ -258,6 +259,8 @@ function handleFile() {
     function filterDeath(text, columnIndices) {
         // ヘッダーとレコード行に分割
         const { header, rows } = parseCSV(text);
+        // 日付比較用に、20240604をdate型にする
+        const targetDate = new Date('2024-06-04 00:00:00');
 
         // 条件に合致するレコードのみをフィルタ
         const filteredLines = rows.filter(line => {
@@ -268,7 +271,29 @@ function handleFile() {
                 line[columnIndices[3]],
                 line[columnIndices[4]],
             ];
-            return !(members === '1' && removalDate && notificationDate && reasonCode) && residentsdate  < '20240604';
+
+            // 住民日が空だと日付比較が出来ないため、存在有無を確認する
+            if (!residentsdate) {
+                throw new Error('【宛名番号：' + line[columnIndices[5]] + '】\n「住民日」列が空です。インプットファイルの確認をお願いします。');
+            }
+
+            // 住民日を日付型に変換する。住民日は「yyyymmdd」形式（8桁）で入力されているので、「parseDate」で一度ばらけさせて日付オブジェクトにしてからDate型に変換する
+            const residentsDateObj = parseDate(residentsdate);
+
+            function parseDate(yyyymmdd) {
+                const year = yyyymmdd.substring(0, 4);
+                const month = yyyymmdd.substring(4, 6) - 1;
+                const day = yyyymmdd.substring(6, 8);
+                return new Date(year, month, day);
+            }
+
+            // 条件がわかりづらいため変数として定義する
+            const condition1 = !(members === '1' && removalDate && notificationDate && reasonCode);
+            const condition2 = residentsDateObj < targetDate;
+
+            // 抽出判定を実施する
+            const judge = condition1 && condition2;
+            return judge;
         });
 
         return [header.join(','), ...filteredLines.map(line => line.join(','))].join('\n');
@@ -327,9 +352,24 @@ function deleteRowsByAddressNumber() {
         const addressNumIndex2 = R5BeneficiaryListHeader.indexOf(keys[0]); // 宛名番号のインデックス（ファイル2）
         const householdNumIndex2 = R5BeneficiaryListHeader.indexOf(keys[1]); // 世帯番号のインデックス（ファイル2])
 
-        // 必要なキーが見つからない場合のエラーハンドリング
-        if (addressNumIndex1 === -1 || householdNumIndex1 === -1 || addressNumIndex2 === -1 || householdNumIndex2 === -1) {
-            throw new Error('宛名番号または世帯番号列が見つかりません。');
+
+        // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
+        const missingColumns = [];
+        if (addressNumIndex1 === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：' + keys[0]);
+        }
+        if (householdNumIndex1 === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：' + keys[1]);
+        }
+        if (addressNumIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：' + keys[0]);
+        }
+        if (householdNumIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：' + keys[1]);
+        }
+
+        if (missingColumns.length > 0) {
+            throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
         }
 
         // 2つ目のCSVファイルの宛名番号と世帯番号のセットを作成
@@ -355,7 +395,7 @@ function deleteRowsByReason() {
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
     }
-    
+
     // 処理開始log
     logger.info('STEP 4 処理を開始しました');
 
@@ -398,9 +438,20 @@ function deleteRowsByReason() {
         const addressNumIndex2 = ReasonForAbolitionheader.indexOf('宛名番号');
         const reasonIndex = ReasonForAbolitionheader.indexOf('廃止理由');
 
-        // インデックスが見つからない場合のエラーハンドリング
-        if (addressNumIndex1 === -1 || addressNumIndex2 === -1 || reasonIndex === -1) {
-            throw new Error('宛名番号または廃止理由列が見つかりません。');
+        // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
+        const missingColumns = [];
+        if (addressNumIndex1 === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (addressNumIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (reasonIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：廃止理由');
+        }
+
+        if (missingColumns.length > 0) {
+            throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
         }
 
         // arrayFromReasonForAbolitionList内の、廃止理由が'18'である行の宛名番号をセットに格納
@@ -424,7 +475,7 @@ function ChangeRowsFromInstitutionCode() {
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
     }
-    
+
     // 処理開始log
     logger.info('STEP 5 処理を開始しました');
 
@@ -467,9 +518,20 @@ function ChangeRowsFromInstitutionCode() {
         const idCodeIndex = InstitutionCodeheader.indexOf('既存の識別コード');
         const agencyCodeIndex = InstitutionCodeheader.indexOf('機関コード');
 
-        // インデックスが見つからない場合のエラーハンドリング
-        if (addressCodeIndex === -1 || idCodeIndex === -1 || agencyCodeIndex === -1) {
-            throw new Error('必要な列が見つかりません。');
+        // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
+        const missingColumns = [];
+        if (addressCodeIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：転入元都道府県市区町村コード');
+        }
+        if (idCodeIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：既存の識別コード');
+        }
+        if (agencyCodeIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：機関コード');
+        }
+
+        if (missingColumns.length > 0) {
+            throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
         }
 
         // 中間ファイルのヘッダーに「情報提供者機関コード」カラムを新規作成する
