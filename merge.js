@@ -214,16 +214,16 @@ function handleFile() {
             let text = e.target.result;
 
             // 必要なヘッダーがあるかチェック
-            const lines = text.split('\n').map(line => line.split(','));
-            const headers = lines[0];
+            const { header, rows } = parseCSV(text);
             const requiredColumns = [
                 '世帯員の人数',
                 '消除日',
                 '消除届出日',
-                '消除事由コード'
+                '消除事由コード',
+                '住民日'
             ];
             // カラムのインデックスを取得
-            const columnIndices = requiredColumns.map(col => headers.indexOf(col));
+            const columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
             const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
@@ -254,20 +254,21 @@ function handleFile() {
     // onloadイベントを発火
     reader.readAsText(files[0]);
 
-    /* 死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理 */
+    /* 死亡している（世帯員の人数が1で、消除日、消除届出日、消除事由コードが入力されている）住民を除外する処理・住民日がR6.6.4~の住民を除外する処理 */
     function filterDeath(text, columnIndices) {
-        // ヘッダーとデータレコーダーに分割
+        // ヘッダーとレコード行に分割
         const { header, rows } = parseCSV(text);
 
         // 条件に合致するレコードのみをフィルタ
         const filteredLines = rows.filter(line => {
-            const [members, removalDate, notificationDate, reasonCode] = [
+            const [members, removalDate, notificationDate, reasonCode, residentsdate] = [
                 line[columnIndices[0]],
                 line[columnIndices[1]],
                 line[columnIndices[2]],
-                line[columnIndices[3]]
+                line[columnIndices[3]],
+                line[columnIndices[4]],
             ];
-            return !(members === '1' && removalDate && notificationDate && reasonCode);
+            return !(members === '1' && removalDate && notificationDate && reasonCode) && residentsdate  < '20240604';
         });
 
         return [header.join(','), ...filteredLines.map(line => line.join(','))].join('\n');
@@ -283,6 +284,7 @@ function deleteRowsByAddressNumber() {
         return; // ファイル数が足りない場合は処理を終了
     }
 
+    // 処理開始log
     logger.info('STEP 3 処理を開始しました');
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
@@ -353,7 +355,8 @@ function deleteRowsByReason() {
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
     }
-
+    
+    // 処理開始log
     logger.info('STEP 4 処理を開始しました');
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
@@ -421,7 +424,8 @@ function ChangeRowsFromInstitutionCode() {
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
     }
-
+    
+    // 処理開始log
     logger.info('STEP 5 処理を開始しました');
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
@@ -481,10 +485,6 @@ function ChangeRowsFromInstitutionCode() {
 
         // 中間ファイルの各行を更新
         const updatedRows = arrayFromMidFile.rows.map((line, index) => {
-            if (index === 0) {
-                // ヘッダー行はそのまま返す
-                return line;
-            }
             const addressCode = line[addressCodeIndex];
             const agencyCode = idCodeMap.get(addressCode) || '';
             line.push(agencyCode);
@@ -516,8 +516,7 @@ function deleteRowAndGenerateInquiryFile() {
             let text = e.target.result;
 
             // 必要なヘッダーがあるかチェック
-            const lines = text.split('\n').map(line => line.split(','));
-            const headers = lines[0];
+            const { header, rows } = parseCSV(text);
             const requiredColumns = [
                 '宛名番号',
                 '世帯番号',
@@ -526,8 +525,7 @@ function deleteRowAndGenerateInquiryFile() {
                 '異動事由コード',
                 '情報提供者機関コード'
             ];
-            // カラムのインデックスを取得
-            const columnIndices = requiredColumns.map(col => headers.indexOf(col));
+            const columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
             const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
@@ -536,7 +534,7 @@ function deleteRowAndGenerateInquiryFile() {
             }
 
             // ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外（一つのfunctionにまとめています）
-            const filteredText = FilterTaxAndAddressAndMovementReason(text, columnIndices);
+            const filteredText = FilterTaxAndAddressAndMovementReason(columnIndices, header, rows);
             if (!filteredText) {
                 logger.warn("出力対象レコードが存在しませんでした。");
             } else {
@@ -553,9 +551,7 @@ function deleteRowAndGenerateInquiryFile() {
     reader.readAsText(files[0]);
 
     /* ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理 */
-    function FilterTaxAndAddressAndMovementReason(text, columnIndices) {
-        // ヘッダーとデータレコーダーに分割
-        const { header, rows } = parseCSV(text);
+    function FilterTaxAndAddressAndMovementReason(columnIndices, header, rows) {
         const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
 
         // 条件に合致するレコードのみをフィルタ
@@ -620,13 +616,14 @@ function generateFixedLengthFile(text) {
 
 /* 7. 住基照会用ファイル①を出力する処理 */
 /* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
-function generateReferencingFile1() {
+function generatePreviousAddressForeignFile() {
     const fileIds = ['file13'];
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
     }
 
+    // 処理開始log
     logger.info('STEP 7 処理を開始しました');
 
     // 読み込んだデータをresults配列の対応する位置に保存する
@@ -637,8 +634,7 @@ function generateReferencingFile1() {
             let text = e.target.result;
 
             // 必要なヘッダーがあるかチェック
-            const lines = text.split('\n').map(line => line.split(','));
-            const headers = lines[0];
+            const { header, rows } = parseCSV(text);
             const requiredColumns = [
                 '宛名番号',
                 '住民票コード',
@@ -646,7 +642,7 @@ function generateReferencingFile1() {
                 '転入元都道府県市区町村コード'
             ];
             // カラムのインデックスを取得
-            const columnIndices = requiredColumns.map(col => headers.indexOf(col));
+            const columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
             const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
@@ -654,7 +650,7 @@ function generateReferencingFile1() {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
             }
 
-            const filterPreviousPrefectCodeText = filterPreviousPrefectCode(text, columnIndices);
+            const filterPreviousPrefectCodeText = filterPreviousPrefectCode(columnIndices, rows);
             if (!filterPreviousPrefectCodeText) {
                 logger.warn("出力対象レコードが存在しませんでした。");
             } else {
@@ -671,9 +667,8 @@ function generateReferencingFile1() {
     reader.readAsText(files[0]);
 
     /* 転入元都道府県市区町村コードが「99999」かつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれでもない住民を抽出し、ファイル形式を整える */
-    function filterPreviousPrefectCode(text, columnIndices) {
-        // ヘッダーとデータレコーダーに分割
-        const { header, rows } = parseCSV(text);
+    function filterPreviousPrefectCode(columnIndices, rows) {
+        // ヘッダーとレコード行に分割
         const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
 
         // 条件に合致するレコードのみをフィルタする
@@ -717,8 +712,7 @@ function generateNaturalizedCitizenFile() {
             let text = e.target.result;
 
             // 必要なヘッダーがあるかチェック
-            const lines = text.split('\n').map(line => line.split(','));
-            const headers = lines[0];
+            const { header, rows } = parseCSV(text);
             const requiredColumns = [
                 // 以下、ファイル作成用に必要なカラム
                 '宛名番号',
@@ -742,7 +736,7 @@ function generateNaturalizedCitizenFile() {
                 '転入元都道府県市区町村コード'
             ];
             // カラムのインデックスを取得
-            const columnIndices = requiredColumns.map(col => headers.indexOf(col));
+            const columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
             const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
@@ -750,7 +744,7 @@ function generateNaturalizedCitizenFile() {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
             }
 
-            const filterNaturalizedCitizenText = filterChangeReasonCode(text, columnIndices);
+            const filterNaturalizedCitizenText = filterChangeReasonCode(columnIndices, rows);
             if (!filterNaturalizedCitizenText) {
                 logger.warn("出力対象レコードが存在しませんでした。");
             } else {
@@ -767,9 +761,7 @@ function generateNaturalizedCitizenFile() {
     reader.readAsText(files[0]);
 
     /* 転入元都道府県市区町村コードが「99999」ではないかつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれかの住民を抽出し、ファイル形式を整える */
-    function filterChangeReasonCode(text, columnIndices) {
-        // ヘッダーとデータレコーダーに分割
-        const { header, rows } = parseCSV(text);
+    function filterChangeReasonCode(columnIndices, rows) {
         const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
         // 出力用のヘッダーを定義する
         const OutputHeader = [
