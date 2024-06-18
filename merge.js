@@ -10,6 +10,7 @@ const NO_TAXINFO_FILE = "「税情報なし」対象者.DAT";
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
 
+// todo :必須カラムのエラハン、aaa
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
 function mergeTaxCSV() {
     // 各ファイルのIDを配列に格納する
@@ -58,6 +59,34 @@ function mergeTaxCSV() {
         // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
         const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('宛名番号'));
 
+        // 1つ目のCSVデータを基準にマッピングしマージ処理を行う
+        const map = new Map();
+        parsedCSVs[0].rows.forEach(row => {
+            const addressNumber = row[addressIndex[0]];
+            // headersとrowからオブジェクトを生成する
+            const rowObj = parsedCSVs[0].header.reduce((obj, header, i) => {
+                obj[header] = row[i];
+                return obj;
+            }, {});
+            map.set(addressNumber, rowObj);
+        });
+
+        // 他のCSVデータをマッピングしマージ処理を行う
+        for (let fileIndex = 1; fileIndex < parsedCSVs.length; fileIndex++) {
+            parsedCSVs[fileIndex].rows.forEach(row => {
+                const addressNumber = row[addressIndex[fileIndex]];
+                if (map.has(addressNumber)) {
+                    // headersとrowからオブジェクトを生成する
+                    const rowObj = parsedCSVs[fileIndex].header.reduce((obj, header, i) => {
+                        obj[header] = row[i];
+                        return obj;
+                    }, {});
+                    map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
+                }
+            });
+        }
+
+        /* 0618_住基情報以外の行を無視しない処理（旧処理）。確認が取れ次第削除する
         // 各CSVデータをマッピングしマージ処理を行う
         const map = new Map();
         parsedCSVs.forEach((parsed, fileIndex) => {
@@ -70,7 +99,7 @@ function mergeTaxCSV() {
                 }, {});
                 map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
             });
-        });
+        });*/
 
         // 条件ごとに課税区分を入力する
         map.forEach((value) => {
@@ -110,10 +139,11 @@ function mergeTaxCSV() {
         });
 
         const output = [outputHeader, ...outputRows];
-        return output.join('\r\n');
+        return output.join('\r\n') + '\r\n';
     }
 }
 
+// todo :必須カラムのエラハン、基になるファイルを決め打ちしてマージするよう改修
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
     // 各ファイルのIDを配列に格納する
@@ -173,32 +203,34 @@ function mergeCSV() {
         // 出力用のCSVデータを定義する
         const output = [fullHeader.join(',')];
 
-        /* 以下、住基情報を基準としてマージを行うように修正（テストのため一旦コメントアウト）
-         // 住基情報を基準にマージ処理を行う
-         parsedCSVs[0].rows.forEach(row1 => {
-            const addressNumber = row1[addressIndex[0]];
+        // 1つ目のファイル（住基情報）を基準にマッピングしマージ処理を行う
+        const map = new Map();
+        parsedCSVs[0].rows.forEach(row => {
+            const addressNumber = row[addressIndex[0]];
+            // headersとrowからオブジェクトを生成する
             const rowObj = parsedCSVs[0].header.reduce((obj, header, i) => {
-                obj[header] = row1[i];
+                obj[header] = row[i];
                 return obj;
             }, {});
-
-            // 他の3ファイルから対応する行をマージする
-            parsedCSVs.slice(1).forEach((parsed, fileIndex) => {
-                const matchRow = parsed.rows.find(row => row[addressIndex[fileIndex + 1]] === addressNumber);
-                if (matchRow) {
-                    parsed.header.forEach((header, i) => {
-                        rowObj[header] = matchRow[i];
-                    });
-                }
-            });
-
-            // マージ結果を出力用の配列に追加する
-            const outputRow = fullHeader.map(header => rowObj[header] || '');
-            output.push(outputRow.join(','));
+            map.set(addressNumber, rowObj);
         });
 
-        return output.join('\r\n');*/
+        // 他のCSVデータをマッピングしマージ処理を行う
+        for (let fileIndex = 1; fileIndex < parsedCSVs.length; fileIndex++) {
+            parsedCSVs[fileIndex].rows.forEach(row => {
+                const addressNumber = row[addressIndex[fileIndex]];
+                if (map.has(addressNumber)) {
+                    // headersとrowからオブジェクトを生成する
+                    const rowObj = parsedCSVs[fileIndex].header.reduce((obj, header, i) => {
+                        obj[header] = row[i];
+                        return obj;
+                    }, {});
+                    map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
+                }
+            });
+        }
 
+        /* 0618_住基情報以外の行を無視しない処理（旧処理）。確認が取れ次第削除する
         // 各CSVデータをマッピングしマージ処理を行う
         const map = new Map();
         parsedCSVs.forEach((parsed, fileIndex) => {
@@ -211,13 +243,13 @@ function mergeCSV() {
                 }, {});
                 map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
             });
-        });
+        }); */
         
         map.forEach(value => {
             const row = fullHeader.map(header => value[header] || '');
             output.push(row.join(','));
         });
-        return output.join('\r\n'); 
+        return output.join('\r\n') + '\r\n';
     }
 }
 
