@@ -23,7 +23,7 @@ function mergeTaxCSV() {
 
     // 処理開始log
     logger.info('STEP 0 処理を開始しました');
-    showLoading();
+    // showLoading();
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
     const readers = files.map(file => new FileReader());
@@ -45,7 +45,7 @@ function mergeTaxCSV() {
                     logger.error(error);
                 } finally {
                     logger.info('STEP 0 処理を終了しました');
-                    hideLoading();
+                    // hideLoading();
                 }
             }
         };
@@ -303,12 +303,12 @@ function mergeCSV() {
                 map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
             });
         });
-        
+
         map.forEach(value => {
             const row = fullHeader.map(header => value[header] || '');
             output.push(row.join(','));
         });
-        return output.join('\r\n'); 
+        return output.join('\r\n');
     }
 }
 
@@ -730,6 +730,7 @@ function deleteRowAndGenerateInquiryFile() {
 
     // 処理開始log
     logger.info('STEP 5 処理を開始しました');
+    showLoading();
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -740,7 +741,7 @@ function deleteRowAndGenerateInquiryFile() {
 
             // 必要なヘッダーがあるかチェック
             const { header, rows } = parseCSV(text);
-            const requiredColumns = [
+            var requiredColumns = [
                 '宛名番号',
                 '世帯番号',
                 '課税区分',
@@ -748,9 +749,9 @@ function deleteRowAndGenerateInquiryFile() {
                 '異動事由コード',
                 // '情報提供者機関コード' // 20240617_機関コードへの変換処理が不要となったためコメントアウト
             ];
-            const columnIndices = requiredColumns.map(col => header.indexOf(col));
+            var columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
-            const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+            var missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
             if (missingColumns.length > 0) {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
@@ -759,106 +760,13 @@ function deleteRowAndGenerateInquiryFile() {
             // ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外（一つのfunctionにまとめています）
             const filteredText = FilterTaxAndAddressAndMovementReason(columnIndices, header, rows);
             if (!filteredText) {
-                logger.warn("出力対象レコードが存在しませんでした。");
+                logger.warn('■ファイル名：' + NO_TAXINFO_FILE + ' >> 出力対象レコードが存在しませんでした。');
             } else {
                 downloadCSV(filteredText, NO_TAXINFO_FILE);
             }
-        } catch (error) {
-            // catchしたエラーを表示
-            logger.error(error);
-        } finally {
-            logger.info('STEP 5 処理を終了しました');
-        }
-    };
-    // onloadイベントを発火
-    reader.readAsText(files[0]);
 
-    /* ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理 */
-    function FilterTaxAndAddressAndMovementReason(columnIndices, header, rows) {
-        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
-
-        // 条件に合致するレコードのみをフィルタ
-        const filteredLines = rows.filter(line => {
-            const [taxClassification, previousAddressCode, changeReasonCode] = [
-                line[columnIndices[2]],
-                line[columnIndices[3]],
-                line[columnIndices[4]]
-            ];
-            return (taxClassification == '' && previousAddressCode !== '99999' && !validCodes.includes(changeReasonCode));
-        });
-        // generateFixedLengthFileにテキストを渡し、中間サーバに連携する向けにファイル形式を整える
-        return generateFixedLengthFile([header.join(','), ...filteredLines.map(line => line.join(','))].join('\r\n'));
-    }
-}
-
-// 中間サーバ照会用のファイルを作成する処理（他ステップでも使用する予定のため、Globalのfunctionとして作成した）
-function generateFixedLengthFile(text) {
-    const lines = text.split('\n').map(line => line.split(','));
-    const headers = lines[0];
-    const toolUseTime = getCurrentTime().replace(/[:.\-\s]/g, '').trim();
-
-    // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
-    const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
-    const column2 = { length: 15, name: '宛名番号', padding: '0' };
-    const column3 = { length: 15, name: '統合宛名番号', padding: '' };
-    const column4 = { length: 17, name: '照会依頼日時', value: toolUseTime };
-    const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
-    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
-    const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
-    const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
-    const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
-    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
-    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
-    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
-    const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ', padDirection: 'right' };
-    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
-    const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
-    const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
-    const column17 = { length: 8, name: '照会開始日付', padding: '' };
-    const column18 = { length: 8, name: '照会終了日付', padding: '' };
-    // 全カラムを配列にまとめる
-    const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
-        column10, column11, column12, column13, column14, column15, column16, column17, column18];
-
-    return lines.slice(1).map(line => {
-        return columnDefinitions.map(colDef => {
-            const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
-            if (colDef.padDirection === 'left') {
-                // 左側をパディング
-                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
-            } else if (colDef.padDirection === 'right') {
-                // 右側をパディング
-                return value.padEnd(colDef.length, colDef.padding).substring(0, colDef.length);
-            } else {
-                // デフォルトは左側をパディング
-                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
-            }
-        }).join(',');
-    }).join('\r\n') + '\r\n';
-}
-
-/* 6. 住基照会用ファイル①を出力する処理 */
-/* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
-function generatePreviousAddressForeignFile() {
-    const fileIds = ['file13'];
-    const { check, file_num, files } = fileCheck(fileIds);
-    if (!check) {
-        return; // ファイル数が足りない場合は処理を終了
-    }
-
-    // 処理開始log
-    logger.info('STEP 6 処理を開始しました');
-
-    // 読み込んだデータをresults配列の対応する位置に保存する
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        try {
-            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
-            let text = e.target.result;
-
-            // 必要なヘッダーがあるかチェック
-            const { header, rows } = parseCSV(text);
-            const requiredColumns = [
+            // 元STEP6 //
+            requiredColumns = [
                 '宛名番号',
                 '住民票コード',
                 '異動事由コード',
@@ -866,9 +774,9 @@ function generatePreviousAddressForeignFile() {
                 // '転入元都道府県市区町村コード' // 20240617_機関コードへの変換処理が不要となったためコメントアウト
             ];
             // カラムのインデックスを取得
-            const columnIndices = requiredColumns.map(col => header.indexOf(col));
+            columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
-            const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+            missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
             if (missingColumns.length > 0) {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
@@ -876,68 +784,13 @@ function generatePreviousAddressForeignFile() {
 
             const filterPreviousPrefectCodeText = filterPreviousPrefectCode(columnIndices, rows);
             if (!filterPreviousPrefectCodeText) {
-                logger.warn("出力対象レコードが存在しませんでした。");
+                logger.warn('■ファイル名：' + RESIDENTINFO_INQUIRY_FILE_1 + ' >> 出力対象レコードが存在しませんでした。');
             } else {
                 downloadCSV(filterPreviousPrefectCodeText, RESIDENTINFO_INQUIRY_FILE_1);
             }
-        } catch (error) {
-            // catchしたエラーを表示
-            logger.error(error);
-        } finally {
-            logger.info('STEP 6 処理を終了しました');
-        }
-    };
-    // onloadイベントを発火
-    reader.readAsText(files[0]);
 
-    /* 転入元都道府県市区町村コードが「99999」かつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれでもない住民を抽出し、ファイル形式を整える */
-    function filterPreviousPrefectCode(columnIndices, rows) {
-        // ヘッダーとレコード行に分割
-        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
-
-        // 条件に合致するレコードのみをフィルタする
-        const filteredLines = rows.filter(line => {
-            const [changeReasonCode, previousAddressCode] = [
-                line[columnIndices[2]],
-                line[columnIndices[3]]
-            ];
-            return (!validCodes.includes(changeReasonCode) && previousAddressCode == '99999');
-        });
-
-        // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出する
-        const selectedLines = filteredLines.map(line => [
-            line[columnIndices[0]],  // 宛名番号列
-            line[columnIndices[1]]   // 住民票コード列
-        ]);
-
-        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return [['宛名番号', '住民票コード'].join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
-    }
-}
-
-/* 7. 帰化対象者をファイルを出力する処理 */
-function generateNaturalizedCitizenFile() {
-    // 各ファイルのIDを配列に格納する
-    const fileIds = ['file14'];
-    // 各ファイルのIDを配列に格納する
-    const { check, file_num, files } = fileCheck(fileIds);
-    if (!check) {
-        return; // ファイル数が足りない場合は処理を終了
-    }
-
-    // 処理開始log
-    logger.info('STEP 7 処理を開始しました');
-
-    // 読み込んだデータをresults配列の対応する位置に保存する
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        try {
-            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
-            let text = e.target.result;
-
-            // 必要なヘッダーがあるかチェック
-            const { header, rows } = parseCSV(text);
-            const requiredColumns = [
+            // 元STEP7 //
+            requiredColumns = [
                 // 以下、ファイル作成用に必要なカラム
                 '宛名番号',
                 '世帯番号',
@@ -960,9 +813,9 @@ function generateNaturalizedCitizenFile() {
                 '転入元都道府県市区町村コード'
             ];
             // カラムのインデックスを取得
-            const columnIndices = requiredColumns.map(col => header.indexOf(col));
+            columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
-            const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+            missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
             if (missingColumns.length > 0) {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
@@ -970,21 +823,70 @@ function generateNaturalizedCitizenFile() {
 
             const filterNaturalizedCitizenText = filterChangeReasonCode(columnIndices, rows);
             if (!filterNaturalizedCitizenText) {
-                logger.warn("出力対象レコードが存在しませんでした。");
+                logger.warn('■ファイル名：' + NATURALIZED_CITIZEN_FILE + ' >> 出力対象レコードが存在しませんでした。');
             } else {
                 downloadCSV(filterNaturalizedCitizenText, NATURALIZED_CITIZEN_FILE);
             }
+
         } catch (error) {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 7 処理を終了しました');
+            logger.info('STEP 5 処理を終了しました');
+            hideLoading();
         }
     };
     // onloadイベントを発火
     reader.readAsText(files[0]);
 
-    /* 転入元都道府県市区町村コードが「99999」ではないかつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれかの住民を抽出し、ファイル形式を整える */
+    /**
+     * ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理
+     */
+    function FilterTaxAndAddressAndMovementReason(columnIndices, header, rows) {
+        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
+
+        // 条件に合致するレコードのみをフィルタ
+        const filteredLines = rows.filter(line => {
+            const [taxClassification, previousAddressCode, changeReasonCode] = [
+                line[columnIndices[2]],
+                line[columnIndices[3]],
+                line[columnIndices[4]]
+            ];
+            return (taxClassification == '' && previousAddressCode !== '99999' && !validCodes.includes(changeReasonCode));
+        });
+        // generateFixedLengthFileにテキストを渡し、中間サーバに連携する向けにファイル形式を整える
+        return generateFixedLengthFile([header.join(','), ...filteredLines.map(line => line.join(','))].join('\r\n'));
+    }
+
+    /**
+    *  転入元都道府県市区町村コードが「99999」かつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれでもない住民を抽出し、ファイル形式を整える 
+    */
+    function filterPreviousPrefectCode(columnIndices, rows) {
+        // ヘッダーとレコード行に分割
+        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
+
+        // 条件に合致するレコードのみをフィルタする
+        const filteredLines = rows.filter(line => {
+            const [changeReasonCode, previousAddressCode] = [
+                line[columnIndices[2]],
+                line[columnIndices[3]]
+            ];
+            return (!validCodes.includes(changeReasonCode) && previousAddressCode == '99999');
+        });
+
+        // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出する
+        const selectedLines = filteredLines.map(line => [
+            line[columnIndices[0]],  // 宛名番号列
+            line[columnIndices[1]]   // 住民票コード列
+        ]);
+
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+        return [['宛名番号', '住民票コード'].join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+    }
+
+    /**
+    * 転入元都道府県市区町村コードが「99999」ではないかつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれかの住民を抽出し、ファイル形式を整える
+    */
     function filterChangeReasonCode(columnIndices, rows) {
         const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
         // 出力用のヘッダーを定義する
@@ -1041,6 +943,257 @@ function generateNaturalizedCitizenFile() {
         return [outputHeader.join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
     }
 }
+
+// 中間サーバ照会用のファイルを作成する処理（他ステップでも使用する予定のため、Globalのfunctionとして作成した）
+function generateFixedLengthFile(text) {
+    const lines = text.split('\n').map(line => line.split(','));
+    const headers = lines[0];
+    const toolUseTime = getCurrentTime().replace(/[:.\-\s]/g, '').trim();
+
+    // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
+    const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
+    const column2 = { length: 15, name: '宛名番号', padding: '0' };
+    const column3 = { length: 15, name: '統合宛名番号', padding: '' };
+    const column4 = { length: 17, name: '照会依頼日時', value: toolUseTime };
+    const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
+    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
+    const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
+    const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
+    const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
+    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
+    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
+    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
+    const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ', padDirection: 'right' };
+    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
+    const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
+    const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
+    const column17 = { length: 8, name: '照会開始日付', padding: '' };
+    const column18 = { length: 8, name: '照会終了日付', padding: '' };
+    // 全カラムを配列にまとめる
+    const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
+        column10, column11, column12, column13, column14, column15, column16, column17, column18];
+
+    return lines.slice(1).map(line => {
+        return columnDefinitions.map(colDef => {
+            const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
+            if (colDef.padDirection === 'left') {
+                // 左側をパディング
+                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+            } else if (colDef.padDirection === 'right') {
+                // 右側をパディング
+                return value.padEnd(colDef.length, colDef.padding).substring(0, colDef.length);
+            } else {
+                // デフォルトは左側をパディング
+                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+            }
+        }).join(',');
+    }).join('\r\n') + '\r\n';
+}
+
+/* 6. 住基照会用ファイル①を出力する処理 */
+/* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
+// function generatePreviousAddressForeignFile() {
+//     const fileIds = ['file13'];
+//     const { check, file_num, files } = fileCheck(fileIds);
+//     if (!check) {
+//         return; // ファイル数が足りない場合は処理を終了
+//     }
+
+//     // 処理開始log
+//     logger.info('STEP 6 処理を開始しました');
+
+//     // 読み込んだデータをresults配列の対応する位置に保存する
+//     const reader = new FileReader();
+//     reader.onload = function (e) {
+//         try {
+//             // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+//             let text = e.target.result;
+
+//             // 必要なヘッダーがあるかチェック
+//             const { header, rows } = parseCSV(text);
+//             const requiredColumns = [
+//                 '宛名番号',
+//                 '住民票コード',
+//                 '異動事由コード',
+//                 '転入元都道府県市区町村コード' // 20240617_機関コードへの変換処理が不要となったため追加
+//                 // '転入元都道府県市区町村コード' // 20240617_機関コードへの変換処理が不要となったためコメントアウト
+//             ];
+//             // カラムのインデックスを取得
+//             const columnIndices = requiredColumns.map(col => header.indexOf(col));
+//             // 足りないカラムをチェック
+//             const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+//             if (missingColumns.length > 0) {
+//                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+//             }
+
+//             const filterPreviousPrefectCodeText = filterPreviousPrefectCode(columnIndices, rows);
+//             if (!filterPreviousPrefectCodeText) {
+//                 logger.warn("出力対象レコードが存在しませんでした。");
+//             } else {
+//                 downloadCSV(filterPreviousPrefectCodeText, RESIDENTINFO_INQUIRY_FILE_1);
+//             }
+//         } catch (error) {
+//             // catchしたエラーを表示
+//             logger.error(error);
+//         } finally {
+//             logger.info('STEP 6 処理を終了しました');
+//         }
+//     };
+//     // onloadイベントを発火
+//     reader.readAsText(files[0]);
+
+//     /* 転入元都道府県市区町村コードが「99999」かつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれでもない住民を抽出し、ファイル形式を整える */
+//     function filterPreviousPrefectCode(columnIndices, rows) {
+//         // ヘッダーとレコード行に分割
+//         const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
+
+//         // 条件に合致するレコードのみをフィルタする
+//         const filteredLines = rows.filter(line => {
+//             const [changeReasonCode, previousAddressCode] = [
+//                 line[columnIndices[2]],
+//                 line[columnIndices[3]]
+//             ];
+//             return (!validCodes.includes(changeReasonCode) && previousAddressCode == '99999');
+//         });
+
+//         // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出する
+//         const selectedLines = filteredLines.map(line => [
+//             line[columnIndices[0]],  // 宛名番号列
+//             line[columnIndices[1]]   // 住民票コード列
+//         ]);
+
+//         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+//         return [['宛名番号', '住民票コード'].join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+//     }
+// }
+
+/* 7. 帰化対象者をファイルを出力する処理 */
+// function generateNaturalizedCitizenFile() {
+//     // 各ファイルのIDを配列に格納する
+//     const fileIds = ['file14'];
+//     // 各ファイルのIDを配列に格納する
+//     const { check, file_num, files } = fileCheck(fileIds);
+//     if (!check) {
+//         return; // ファイル数が足りない場合は処理を終了
+//     }
+
+//     // 処理開始log
+//     logger.info('STEP 7 処理を開始しました');
+
+//     // 読み込んだデータをresults配列の対応する位置に保存する
+//     const reader = new FileReader();
+//     reader.onload = function (e) {
+//         try {
+//             // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+//             let text = e.target.result;
+
+//             // 必要なヘッダーがあるかチェック
+//             const { header, rows } = parseCSV(text);
+//             const requiredColumns = [
+//                 // 以下、ファイル作成用に必要なカラム
+//                 '宛名番号',
+//                 '世帯番号',
+//                 'カナ氏名',
+//                 '漢字氏名',
+//                 '生年月日',
+//                 '性別',
+//                 '届出日',
+//                 '異動日',
+//                 '異動事由コード', //このカラムは、抽出判定時にもファイル作成時にも使用する
+//                 '住民日',
+//                 '住民届出日',
+//                 '住民事由コード',
+//                 '現住所住定日',
+//                 '現住所届出日',
+//                 '消除日',
+//                 '消除届出日',
+//                 '消除事由コード',
+//                 // 以下、除外の判定のために必要なカラム（99999であれば除外する用）
+//                 '転入元都道府県市区町村コード'
+//             ];
+//             // カラムのインデックスを取得
+//             const columnIndices = requiredColumns.map(col => header.indexOf(col));
+//             // 足りないカラムをチェック
+//             const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+//             if (missingColumns.length > 0) {
+//                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+//             }
+
+//             const filterNaturalizedCitizenText = filterChangeReasonCode(columnIndices, rows);
+//             if (!filterNaturalizedCitizenText) {
+//                 logger.warn("出力対象レコードが存在しませんでした。");
+//             } else {
+//                 downloadCSV(filterNaturalizedCitizenText, NATURALIZED_CITIZEN_FILE);
+//             }
+//         } catch (error) {
+//             // catchしたエラーを表示
+//             logger.error(error);
+//         } finally {
+//             logger.info('STEP 7 処理を終了しました');
+//         }
+//     };
+//     // onloadイベントを発火
+//     reader.readAsText(files[0]);
+
+//     /* 転入元都道府県市区町村コードが「99999」ではないかつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれかの住民を抽出し、ファイル形式を整える */
+//     function filterChangeReasonCode(columnIndices, rows) {
+//         const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
+//         // 出力用のヘッダーを定義する
+//         const outputHeader = [
+//             '宛名番号',
+//             '世帯番号',
+//             'カナ氏名',
+//             '漢字氏名',
+//             '生年月日',
+//             '性別',
+//             '届出日',
+//             '異動日',
+//             '異動事由コード',
+//             '住民日',
+//             '住民届出日',
+//             '住民事由コード',
+//             '現住所住定日',
+//             '現住所届出日',
+//             '消除日',
+//             '消除届出日',
+//             '消除事由コード',
+//         ];
+
+//         // 条件に合致する行を抽出する
+//         const filteredLines = rows.filter(line => {
+//             const [changeReasonCode, previousAddressCode] = [
+//                 line[columnIndices[8]],
+//                 line[columnIndices[17]]
+//             ];
+//             return (validCodes.includes(changeReasonCode) && previousAddressCode !== '99999');
+//         });
+
+//         // フィルタリングされた行から、必要なカラムのデータのみを抽出する
+//         const selectedLines = filteredLines.map(line => [
+//             line[columnIndices[0]],
+//             line[columnIndices[1]],
+//             line[columnIndices[2]],
+//             line[columnIndices[3]],
+//             line[columnIndices[4]],
+//             line[columnIndices[5]],
+//             line[columnIndices[6]],
+//             line[columnIndices[7]],
+//             line[columnIndices[8]],
+//             line[columnIndices[9]],
+//             line[columnIndices[10]],
+//             line[columnIndices[11]],
+//             line[columnIndices[12]],
+//             line[columnIndices[13]],
+//             line[columnIndices[14]],
+//             line[columnIndices[15]],
+//             line[columnIndices[16]]
+//         ]);
+//         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+//         return [outputHeader.join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+//     }
+// }
 
 
 
@@ -1531,15 +1684,15 @@ class Logger {
 // ログ出力クラスのインスタンス化
 var logger = new Logger(LOG_LEVEL); // 引数以上のレベルのログのみを出力します（infoの場合、debugログは出力されない）
 
-/**
- * ロード中のグルグルを表示
- */
-function showLoading(){
-    document.getElementById('load_circle').style.display = "block";
-}
-/**
- * ロード中のグルグルを非表示
- */
-function hideLoading(){
-    document.getElementById('load_circle').style.display = "none";
-}
+// /**
+//  * ロード中のグルグルを表示
+//  */
+// function showLoading() {
+//     //document.getElementById('load_circle').style.display = "block";
+// }
+// /**
+//  * ロード中のグルグルを非表示
+//  */
+// function hideLoading() {
+//     //document.getElementById('load_circle').style.display = "none";
+// }
