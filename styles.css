@@ -43,3 +43,54 @@
 .log-error {
     color: red;
 }
+
+circle {
+    fill: none;
+    stroke: rgb(48, 255, 59);
+    stroke-width: 20;
+    stroke-linecap: round;
+    /* 使うkeyframesの名前、再生時間、補間の仕方、繰り返すかどうか、をそれぞれ指定している */
+    animation: wax-and-wane 2s cubic-bezier(.5, 0, .5, 1) infinite, rotate 1.5s linear infinite;
+}
+
+#load_circle {
+    position: fixed;
+    right: 50%;
+    top: 25%;
+    display: none;/* 初期は非表示 */
+}
+
+
+/* 全体の再生時間のn%のときになってほしいCSSプロパティを指定する */
+@keyframes wax-and-wane {
+
+    /* 状態1 */
+    0% {
+        stroke-dasharray: 236 78;
+        stroke-dashoffset: -37;
+    }
+
+    /* 状態2 */
+    50% {
+        stroke-dasharray: 20 294;
+        stroke-dashoffset: -304;
+    }
+
+    /* 状態3 */
+    100% {
+        stroke-dasharray: 236 78;
+        stroke-dashoffset: -351;
+    }
+}
+
+@keyframes rotate {
+
+    /* 0%の時はどっちみち0度なので省略してもよいです */
+    0% {
+        transform: rotate(0);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}

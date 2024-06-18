@@ -23,6 +23,7 @@ function mergeTaxCSV() {
 
     // 処理開始log
     logger.info('STEP 0 処理を開始しました');
+    showLoading();
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
     const readers = files.map(file => new FileReader());
@@ -44,6 +45,7 @@ function mergeTaxCSV() {
                     logger.error(error);
                 } finally {
                     logger.info('STEP 0 処理を終了しました');
+                    hideLoading();
                 }
             }
         };
@@ -1528,3 +1530,16 @@ class Logger {
 
 // ログ出力クラスのインスタンス化
 var logger = new Logger(LOG_LEVEL); // 引数以上のレベルのログのみを出力します（infoの場合、debugログは出力されない）
+
+/**
+ * ロード中のグルグルを表示
+ */
+function showLoading(){
+    document.getElementById('load_circle').style.display = "block";
+}
+/**
+ * ロード中のグルグルを非表示
+ */
+function hideLoading(){
+    document.getElementById('load_circle').style.display = "none";
+}
