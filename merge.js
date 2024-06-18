@@ -114,6 +114,95 @@ function mergeTaxCSV() {
     }
 }
 
+
+
+
+/*async function mergeTaxCSV() {
+    const fileIds = ['LevyMaster', 'PersonalMaster'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        alert('ファイル数が足りません。必要なファイルを選択してください。');
+        return;
+    }
+
+    logger.info('STEP 0 処理を開始しました');
+
+    try {
+        const fileContents = await Promise.all(files.map(file => readFileAsync(file)));
+        const mergedCSV = processCSVData(fileContents);
+        downloadCSV(mergedCSV, MIDDLE_FILE_0);
+    } catch (error) {
+        logger.error(error);
+        alert(`ファイルの読み込み中にエラーが発生しました: ${error.message}`);
+    } finally {
+        logger.info('STEP 0 処理を終了しました');
+    }
+
+    function readFileAsync(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (e) => reject(new Error(`ファイル ${file.name} の読み込みに失敗しました: ${e.target.error.message}`));
+            reader.readAsText(file);
+        });
+    }
+
+    function processCSVData(csvFiles) {
+        const parsedCSVs = csvFiles.map(parseCSV);
+        parsedCSVs.forEach(parsed => parsed.header = removeStrFromHeader(parsed.header, "ＦＩ－"));
+
+        const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('宛名番号'));
+        const map = new Map();
+
+        parsedCSVs.forEach((parsed, fileIndex) => {
+            parsed.rows.forEach(row => {
+                const addressNumber = row[addressIndex[fileIndex]];
+                const rowObj = parsed.header.reduce((obj, header, i) => {
+                    obj[header] = row[i];
+                    return obj;
+                }, {});
+                map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
+            });
+        });
+
+        map.forEach((value) => {
+            const incomePercentage = Number(value['所得割額']);
+            const equalPercentage = Number(value['均等割額']);
+            const causeForCorrection = String(value['更正事由']);
+
+            if (incomePercentage === 0 && equalPercentage === 0 && !causeForCorrection.startsWith("03")) {
+                value['課税区分'] = '1';
+            } else if (incomePercentage === 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+                value['課税区分'] = '2';
+            } else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+                value['課税区分'] = '3';
+            } else if (incomePercentage > 0 && equalPercentage === 0 && !causeForCorrection.startsWith("03")) {
+                throw new Error(`【宛名番号：${value['宛名番号']}の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。`);
+            } else if (causeForCorrection.startsWith("03")) {
+                value['課税区分'] = '4';
+            } else {
+                value['課税区分'] = '';
+            }
+        });
+
+        const selectedColumns = ['宛名番号', '所得割額', '均等割額', '課税区分', '更正事由', '生年月日'];
+        const outputHeader = selectedColumns.join(',');
+
+        const outputRows = [];
+        map.forEach(value => {
+            const row = selectedColumns.map(header => value[header] || '');
+            outputRows.push(row.join(','));
+        });
+
+        return [outputHeader, ...outputRows].join('\r\n');
+    }
+}*/
+
+
+
+
+
+
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
     // 各ファイルのIDを配列に格納する
@@ -638,7 +727,7 @@ function deleteRowAndGenerateInquiryFile() {
     }
 
     // 処理開始log
-    logger.info('STEP 6 処理を開始しました');
+    logger.info('STEP 5 処理を開始しました');
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -676,7 +765,7 @@ function deleteRowAndGenerateInquiryFile() {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 6 処理を終了しました');
+            logger.info('STEP 5 処理を終了しました');
         }
     };
     // onloadイベントを発火
@@ -756,7 +845,7 @@ function generatePreviousAddressForeignFile() {
     }
 
     // 処理開始log
-    logger.info('STEP 7 処理を開始しました');
+    logger.info('STEP 6 処理を開始しました');
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -793,7 +882,7 @@ function generatePreviousAddressForeignFile() {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 7 処理を終了しました');
+            logger.info('STEP 6 処理を終了しました');
         }
     };
     // onloadイベントを発火
@@ -835,7 +924,7 @@ function generateNaturalizedCitizenFile() {
     }
 
     // 処理開始log
-    logger.info('STEP 8 処理を開始しました');
+    logger.info('STEP 7 処理を開始しました');
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -887,7 +976,7 @@ function generateNaturalizedCitizenFile() {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 8 処理を終了しました');
+            logger.info('STEP 7 処理を終了しました');
         }
     };
     // onloadイベントを発火
