@@ -24,6 +24,7 @@ function mergeTaxCSV() {
 
     // 処理開始log
     logger.info('STEP 0 処理を開始しました');
+    showLoading();
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
     const readers = files.map(file => new FileReader());
@@ -45,6 +46,7 @@ function mergeTaxCSV() {
                     logger.error(error);
                 } finally {
                     logger.info('STEP 0 処理を終了しました');
+                    hideLoading();
                 }
             }
         };
@@ -143,7 +145,6 @@ function mergeTaxCSV() {
     }
 }
 
-// todo :必須カラムのエラハン、基になるファイルを決め打ちしてマージするよう改修
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
     // 各ファイルのIDを配列に格納する
@@ -670,7 +671,7 @@ function deleteRowAndGenerateInquiryFile() {
     }
 
     // 処理開始log
-    logger.info('STEP 6 処理を開始しました');
+    logger.info('STEP 5 処理を開始しました');
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -708,7 +709,7 @@ function deleteRowAndGenerateInquiryFile() {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 6 処理を終了しました');
+            logger.info('STEP 5 処理を終了しました');
         }
     };
     // onloadイベントを発火
@@ -788,7 +789,7 @@ function generatePreviousAddressForeignFile() {
     }
 
     // 処理開始log
-    logger.info('STEP 7 処理を開始しました');
+    logger.info('STEP 6 処理を開始しました');
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -825,7 +826,7 @@ function generatePreviousAddressForeignFile() {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 7 処理を終了しました');
+            logger.info('STEP 6 処理を終了しました');
         }
     };
     // onloadイベントを発火
@@ -867,7 +868,7 @@ function generateNaturalizedCitizenFile() {
     }
 
     // 処理開始log
-    logger.info('STEP 8 処理を開始しました');
+    logger.info('STEP 7 処理を開始しました');
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -919,7 +920,7 @@ function generateNaturalizedCitizenFile() {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 8 処理を終了しました');
+            logger.info('STEP 7 処理を終了しました');
         }
     };
     // onloadイベントを発火
@@ -1376,6 +1377,7 @@ function downloadCSV(content, filename) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    document.getElementById('btn_audio').play();
 }
 
 /**
@@ -1470,3 +1472,16 @@ class Logger {
 
 // ログ出力クラスのインスタンス化
 var logger = new Logger(LOG_LEVEL); // 引数以上のレベルのログのみを出力します（infoの場合、debugログは出力されない）
+
+/**
+ * ロード中のグルグルを表示
+ */
+function showLoading(){
+    document.getElementById('load_circle').style.display = "block";
+}
+/**
+ * ロード中のグルグルを非表示
+ */
+function hideLoading(){
+    document.getElementById('load_circle').style.display = "none";
+}
