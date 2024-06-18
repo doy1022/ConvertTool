@@ -1433,6 +1433,7 @@ function downloadCSV(content, filename) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    document.getElementById('btn_audio').play();
 }
 
 /**
