@@ -10,16 +10,21 @@ const NO_TAXINFO_FILE = "「税情報なし」対象者.DAT";
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
 
-// todo :必須カラムのエラハン、aaa
+// todo :必須カラムのエラハン、
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
 function mergeTaxCSV() {
     // 各ファイルのIDを配列に格納する
-    // 
     const fileIds = ['LevyMaster', 'PersonalMaster'];
     // 各ファイルのIDを配列に格納する
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const fileNameCheck = filenameCheck(files);
+    if (!fileNameCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
@@ -56,6 +61,7 @@ function mergeTaxCSV() {
     function ProcessingDataTakenFromCSV(...csvFiles) {
         // 各CSVファイルをヘッダーとデータ行に分解し、1行ずつ配列に格納する
         const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
+
         // 各ファイルヘッダー内の「ＦＩ－」を取り除く
         parsedCSVs.forEach(parsed => parsed.header = removeStrFromHeader(parsed.header, "ＦＩ－"));
         // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
@@ -109,7 +115,6 @@ function mergeTaxCSV() {
             const incomePercentage = Number(value['所得割額']);
             const equalPercentage = Number(value['均等割額']);
             const causeForCorrection = String(value['更正事由']);
-            // ★★★★★★★★★条件の見直し必須、また、同名のカラムがあるはずなのでindex指定にしたい★★★★★★★★★
             // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
             if (incomePercentage == 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
                 value['課税区分'] = '1';
@@ -153,6 +158,12 @@ function mergeCSV() {
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const fileNameCheck = filenameCheck(files);
+    if (!fileNameCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
@@ -244,8 +255,8 @@ function mergeCSV() {
                 }, {});
                 map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
             });
-        }); */
-        
+        });*/
+
         map.forEach(value => {
             const row = fullHeader.map(header => value[header] || '');
             output.push(row.join(','));
@@ -262,6 +273,12 @@ function handleFile() {
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const fileNameCheck = filenameCheck(files);
+    if (!fileNameCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
@@ -282,7 +299,8 @@ function handleFile() {
                 '住民日',
                 '続柄１',
                 '宛名番号',
-                '世帯番号'
+                '世帯番号',
+                '課税区分'
             ];
             // カラムのインデックスを取得
             const columnIndices = requiredColumns.map(col => header.indexOf(col));
@@ -323,15 +341,19 @@ function handleFile() {
         const { header, rows } = parseCSV(text);
         // 日付比較用に、20240604をdate型にする
         const targetDate = new Date('2024-06-04 00:00:00');
-        // 死亡判定用の消除事由コード（これに含まれていると除外対象になる）
+        // 死亡による全員消除判定用の消除事由コード（これに含まれていると除外対象になる）
         const deathReasonCode = ['B12', 'B22'];
-        // 死亡以外判定用の消除事由コード（これに含まれているかつ消除日がR6.6.4以降だと除外対象になる）
+        // 死亡以外による全員消除判定用の消除事由コード（これに含まれているかつ消除日がR6.6.4以降だと除外対象になる）
         const nonDeathReasonCode = ['B02', 'B32', 'B42', 'B52', 'B62', 'B72', 'BD2', 'BE2', 'BF2', 'BL2', 'BM2'];
+        // 死亡による全員消除判定用の消除事由コード（これに含まれている世帯主がいる場合、世帯は未申告扱いになる）
+        const partOfDeathReasonCode = ['B11', 'B21'];
+        // 死亡以外による全員消除判定用の消除事由コード（これに含まれている世帯主がいるかつ消除日がR6.6.4以前の場合、世帯は未申告扱いになる）
+        const partOfNonDeathReasonCode = ['B01', 'B31', 'B41', 'B51', 'B61', 'B71', 'BD1', 'BE1', 'BF1', 'BL1', 'BM1'];
         // 除外対象の世帯番号の値を収集するためのセット
         const excludedHouseholdNumSet = new Set();
 
         // 一次フィルター：除外対象の世帯主レコードを取得する
-        const primaryFilteredLines = rows.filter(line => {
+        rows.forEach(line => {
             const [removalDate, reasonCode, residentsdate, familyRelationship] = [
                 line[columnIndices[0]],
                 line[columnIndices[1]],
@@ -355,32 +377,64 @@ function handleFile() {
                 return new Date(year, month, day);
             }
 
-            // 条件がわかりづらいため変数として定義する
-            // 世帯主かつ住民日がR6.6.3以前であるレコード
-            const condition1 = familyRelationship === '02' && residentsDateObj < targetDate;
-            // 消除事由が「「死亡申出（全部）」「死亡通知（全部）」のいずれでもないレコード
-            const condition2 = !deathReasonCode.includes(reasonCode);
-            // 消除事由が、死亡以外の「～（全部）」ではなく、消除日がR6.6.3よりあとであるレコード
-            const condition3 = !(nonDeathReasonCode.includes(reasonCode) && removalDateObj < targetDate);
+            // 除外条件がわかりづらいため変数として定義する
+            // 続柄が「02（世帯主）」かつ、住民日がR6.6.3よりあとであるレコード
+            const condition1 = familyRelationship === '02' && residentsDateObj > targetDate;
+            // 消除事由が「「死亡申出（全部）」「死亡通知（全部）」のいずれかであるレコード
+            const condition2 = deathReasonCode.includes(reasonCode);
+            // 消除事由が、死亡以外の「～（全部）」いずれかで、かつ消除日がR6.6.3より前であるレコード
+            const condition3 = nonDeathReasonCode.includes(reasonCode) && removalDateObj < targetDate;
 
             // 抽出判定を実施する
-            const judge = condition1 && condition2 && condition3;
+            const judge = condition1 || condition2 || condition3;
 
-            // 除外対象となる場合は世帯番号の値を収集する
-            if (!judge) {
-                excludedHouseholdNumSet.add(line[columnIndices[6]]);
+            // 除外対象となる世帯番号を収集する
+            if (judge) {
+                excludedHouseholdNumSet.add(line[columnIndices[5]]);
             }
-
-            return judge;
         });
 
         // 二次フィルター：一次フィルターで取得した除外対象の世帯番号を使用し、対象外世帯の世帯員レコードを全て除外する
-        const secondaryFilteredLines = primaryFilteredLines.filter(line => {
+        const secondaryFilteredLines = rows.filter(line => {
             const householdNum = line[columnIndices[5]];
             return !excludedHouseholdNumSet.has(householdNum);
         });
 
-        return [header.join(','), ...secondaryFilteredLines.map(line => line.join(','))].join('\r\n');
+        // 三次フィルター：世帯主が死亡、または他の消除をしている世帯を抽出し、申請書の対象とする（＝課税区分を「4」にする）
+        const finalFilteredLines = secondaryFilteredLines.map(line => {
+            const [removalDate, reasonCode, familyRelationship] = [
+                line[columnIndices[0]],
+                line[columnIndices[1]],
+                line[columnIndices[3]],
+            ];
+
+            // 消除日を日付型に変換する。どちらも「yyyymmdd」形式（8桁）で入力されているので、「parseDate」で一度分割して「年,月,日」の形式にしてからDate型に変換する
+            const removalDateObj = parseDate(removalDate);
+
+            function parseDate(yyyymmdd) {
+                const year = yyyymmdd.substring(0, 4);
+                const month = yyyymmdd.substring(4, 6) - 1;
+                const day = yyyymmdd.substring(6, 8);
+                return new Date(year, month, day);
+            }
+
+            // 続柄が「02（世帯主）」かつ、消除事由が「「死亡申出（一部）」「死亡通知（一部）」のいずれかであるレコード
+            const condition1 = familyRelationship === '02' && partOfDeathReasonCode.includes(reasonCode);
+            // 続柄が「02（世帯主）」かつ、消除事由が死亡以外の「～（一部）」のいずれかかつ、消除日がR6.6.3より前であるレコード
+            const condition2 = familyRelationship === '02' && partOfNonDeathReasonCode.includes(reasonCode) && removalDateObj < targetDate;
+
+            // 抽出判定を実施する
+            const judge = condition1 || condition2
+
+            // 除外対象となる世帯番号を収集する
+            if (judge) {
+                line[columnIndices[6]] = '4';
+            }
+
+            return line;
+        });
+
+        return [header.join(','), ...finalFilteredLines.map(line => line.join(','))].join('\r\n');
     }
 }
 
@@ -390,6 +444,12 @@ function deleteRowsByAddressNumber() {
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const fileNameCheck = filenameCheck(files);
+    if (!fileNameCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
@@ -430,10 +490,10 @@ function deleteRowsByAddressNumber() {
         const r5BeneficiaryListHeader = arrayFromR5BeneficiaryList.header;
 
         // 各キーのインデックスを取得
-        const addressNumIndex1 = midFileHeader.indexOf(keys[0]); // 宛名番号のインデックス（ファイル1）
-        const householdNumIndex1 = midFileHeader.indexOf(keys[1]); // 世帯番号のインデックス（ファイル1）
-        const addressNumIndex2 = r5BeneficiaryListHeader.indexOf(keys[0]); // 宛名番号のインデックス（ファイル2）
-        const householdNumIndex2 = r5BeneficiaryListHeader.indexOf(keys[1]); // 世帯番号のインデックス（ファイル2])
+        const addressNumIndex1 = midFileHeader.indexOf(keys[0]); // 宛名番号のインデックス（中間ファイル）
+        const householdNumIndex1 = midFileHeader.indexOf(keys[1]); // 世帯番号のインデックス（中間ファイル）
+        const addressNumIndex2 = r5BeneficiaryListHeader.indexOf(keys[0]); // 宛名番号のインデックス（R5給付対象者ファイル）
+        const householdNumIndex2 = r5BeneficiaryListHeader.indexOf(keys[1]); // 世帯番号のインデックス（R5給付対象者ファイル）
 
 
         // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
@@ -455,19 +515,33 @@ function deleteRowsByAddressNumber() {
             throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
         }
 
-        // 2つ目のCSVファイルの宛名番号と世帯番号のセットを作成
+        // 一次フィルター：除外対象の住民レコードを、宛名番号をキーにして取得する
+        // R5給付対象者のCSVファイルの宛名番号セットを作成する
         const addressNumberSet = new Set(arrayFromR5BeneficiaryList.rows.map(line => line[addressNumIndex2].trim()));
-        const householdNumberSet = new Set(arrayFromR5BeneficiaryList.rows.map(line => line[householdNumIndex2].trim()));
+        // 除外対象の世帯番号の値を収集するためのセットを作成する
+        const excludedHouseholdNumSet = new Set();
 
-        // 宛名番号または世帯番号がセットに含まれていない行をフィルタリング
-        const filteredRows = arrayFromMidFile.rows.filter((line) => {
+        // 中間ファイルから、宛名番号セット内の値と一致する宛名番号を持つ行（除外対象行）を抽出する
+        const primaryFilteredLines = arrayFromMidFile.rows.filter((line) => {
             const addressNumber = line[addressNumIndex1].trim();
-            const householdNumber = line[householdNumIndex1].trim();
-            return !(addressNumberSet.has(addressNumber) || householdNumberSet.has(householdNumber));
+            const judge = addressNumberSet.has(addressNumber);
+
+            // 中間ファイルから、除外対象となる世帯番号の値を収集する
+            if (judge) {
+                excludedHouseholdNumSet.add(line[householdNumIndex1]);
+            }
+
+            return judge;
+        });
+
+        // 二次フィルター：一次フィルターで取得した除外対象の世帯番号を使用し、対象外世帯の世帯員レコードを全て除外する
+        const secondaryFilteredLines = arrayFromMidFile.rows.filter(line => {
+            const householdNum = line[householdNumIndex1].trim();
+            return !excludedHouseholdNumSet.has(householdNum);
         });
 
         // フィルタリングされた行をCSV形式に戻す
-        return [midFileHeader, ...filteredRows].map(line => line.join(',')).join('\r\n');
+        return [midFileHeader, ...secondaryFilteredLines].map(line => line.join(',')).join('\r\n') + '\r\n';
     }
 }
 
@@ -477,6 +551,12 @@ function deleteRowsByReason() {
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const fileNameCheck = filenameCheck(files);
+    if (!fileNameCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
@@ -566,7 +646,7 @@ function deleteRowsByReason() {
         });
 
         // フィルタリングされた行をCSV形式に戻す
-        return [midFileHeader, ...filteredRows].map(line => line.join(',')).join('\r\n');
+        return [midFileHeader, ...filteredRows].map(line => line.join(',')).join('\r\n') + '\r\n';
     }
 }
 
@@ -670,9 +750,15 @@ function deleteRowAndGenerateInquiryFile() {
         return; // ファイル数が足りない場合は処理を終了
     }
 
+    // 各ファイルのファイル形式をチェック
+    const fileNameCheck = filenameCheck(files);
+    if (!fileNameCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
     // 処理開始log
     logger.info('STEP 5 処理を開始しました');
-    showLoading();
+    //showLoading();
 
     // 読み込んだデータをresults配列の対応する位置に保存する
     const reader = new FileReader();
@@ -797,7 +883,8 @@ function deleteRowAndGenerateInquiryFile() {
             return (taxClassification == '' && previousAddressCode !== '99999' && !validCodes.includes(changeReasonCode));
         });
         // generateFixedLengthFileにテキストを渡し、中間サーバに連携する向けにファイル形式を整える
-        return generateFixedLengthFile([header.join(','), ...filteredLines.map(line => line.join(','))].join('\r\n'));
+        // 口座照会用ファイルと仕様は同じだが「事務手続きコード」「情報提供者機関コード」「特定個人情報名コード」が異なるため、引数で値を渡す
+        return generateFixedLengthFile([header.join(','), ...filteredLines.map(line => line.join(','))].join('\r\n'), 'JT01010000000214', 'TM00000000000002');
     }
 
     /**
@@ -887,7 +974,7 @@ function deleteRowAndGenerateInquiryFile() {
 }
 
 // 中間サーバ照会用のファイルを作成する処理（他ステップでも使用する予定のため、Globalのfunctionとして作成した）
-function generateFixedLengthFile(text) {
+function generateFixedLengthFile(text, procedureCode, personalInfoCode) {
     const lines = text.split('\n').map(line => line.split(','));
     const headers = lines[0];
     const toolUseTime = getCurrentTime().replace(/[:.\-\s]/g, '').trim();
@@ -902,11 +989,11 @@ function generateFixedLengthFile(text) {
     const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
     const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
     const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
-    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: 'JT01010000000214' };
+    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: procedureCode };
     const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
     const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
-    const column13 = { length: 16, name: '情報提供者機関コード', padding: ' ', padDirection: 'right' };
-    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: 'TM00000000000002' };
+    const column13 = { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right' };// 仕様のカラム名は「情報提供者機関コード」だが、インプットになるカラム名を設定
+    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: personalInfoCode };
     const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
     const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
     const column17 = { length: 8, name: '照会開始日付', padding: '' };
@@ -1440,6 +1527,28 @@ function fileCheck(fileIds) {
         check = true;
     }
     return { check, file_num, files };
+}
+
+/* アップロードされたファイルがCSV形式かを確認する処理 */
+function filenameCheck(files) {
+    let fileNameCheck = false;
+    // 拡張子が.csvでないファイルを格納する配列
+    const errorFileNames = [];
+
+    // 各ファイルの拡張子をチェック
+    files.forEach(file => {
+        if (!file.name.endsWith('.csv')) {
+            errorFileNames.push(file.name);
+        }
+    });
+
+    // エラーとして拡張子が「.csv」でないファイル名を表示する
+    if (errorFileNames.length > 0) {
+        alert('以下のファイルの拡張子が「.csv」ではありません。\nアップロードするファイルはCSVファイルを使用して下さい。\n' + errorFileNames.join('\n'));
+    } else {
+        fileNameCheck = true;
+    }
+    return fileNameCheck;
 }
 
 /* 単一ファイル処理の汎用関数 */
