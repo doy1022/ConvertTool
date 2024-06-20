@@ -26,7 +26,7 @@
         <form id="csvForm1">
             <label for="file1">住基情報ファイルをアップロードして下さい:</label>
             <input type="file" id="file1" accept=".csv"><br><br>
-            <label for="file2">税情報ファイルをアップロードして下さい:</label>
+            <label for="file2">中間ファイル⓪をアップロードして下さい:</label>
             <input type="file" id="file2" accept=".csv"><br><br>
             <label for="file3">住民票コードをアップロードして下さい:</label>
             <input type="file" id="file3" accept=".csv"><br><br>
@@ -39,7 +39,7 @@
         <form id="csvForm2">
             <label for="csvFile1">中間ファイル①をアップロードして下さい:</label>
             <input type="file" id="midFile1" accept=".csv"><br><br>
-            <button type="button" onclick="handleFile()">中間ファイル③を作成する</button>
+            <button type="button" onclick="handleFile()">中間ファイル②を作成する</button>
         </form>
 
         <!--h1>3.死亡している住民を除外する</h1>
@@ -51,20 +51,20 @@
 
         <h1>3.R5給付対象者を宛名番号・世帯番号をキーとして除外する</h1>
         <form id="csvForm4">
-            <label for="file5">中間ファイル③をアップロードして下さい:</label>
+            <label for="file5">中間ファイル②をアップロードして下さい:</label>
             <input type="file" id="file5" accept=".csv"><br><br>
             <label for="file6">R5給付対象者ファイルをアップロードして下さい:</label>
             <input type="file" id="file6" accept=".csv"><br><br>
-            <button type="button" onclick="deleteRowsByAddressNumber()">中間ファイル④を作成する</button>
+            <button type="button" onclick="deleteRowsByAddressNumber()">中間ファイル③を作成する</button>
         </form>
 
         <h1>4.廃止事由より「18（他区課税）」の住民を給付対象外として除外する</h1>
         <form id="csvForm5">
-            <label for="file7">中間ファイル④をアップロードして下さい:</label>
+            <label for="file7">中間ファイル③をアップロードして下さい:</label>
             <input type="file" id="file7" accept=".csv"><br><br>
             <label for="file8">廃止事由ファイルをアップロードして下さい:</label>
             <input type="file" id="file8" accept=".csv"><br><br>
-            <button type="button" onclick="deleteRowsByReason()">中間ファイル⑤を作成する</button>
+            <button type="button" onclick="deleteRowsByReason()">中間ファイル④を作成する</button>
         </form>
 
         <!--<h1>5. 「転入元都道府県市区町村コード」の値を「情報提供者機関コード」に変換する</h1>
@@ -83,9 +83,9 @@
             <li>帰化対象者リスト</li>
         </ul>
         <form id="csvForm6">
-            <label for="file9">中間ファイル⑤をアップロードして下さい:</label>
+            <label for="file9">中間ファイル④をアップロードして下さい:</label>
             <input type="file" id="file9" accept=".csv"><br><br>
-            <button type="button" onclick="deleteRowAndGenerateInquiryFile()">税情報無し対象者ファイルを作成する</button>
+            <button type="button" onclick="deleteRowAndGenerateInquiryFile()">上記3ファイルを作成する</button>
         </form>
 
         <!--<h1>8.抽出した税情報無しの住民リストを、照会ファイルのフォーマットに整える</h1>
