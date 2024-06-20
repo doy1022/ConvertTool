@@ -79,6 +79,9 @@ function mergeTaxCSV() {
             map.set(addressNumber, rowObj);
         });
 
+        // 住基情報に存在しない宛名番号を格納する変数
+        let nonExistingAddresseeNumber = [];
+        let nonExistingAddresseeNumberMap = new Map();
         // 他のCSVデータをマッピングしマージ処理を行う
         for (let fileIndex = 1; fileIndex < parsedCSVs.length; fileIndex++) {
             parsedCSVs[fileIndex].rows.forEach(row => {
@@ -90,10 +93,20 @@ function mergeTaxCSV() {
                         return obj;
                     }, {});
                     map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
+                } else {
+                    nonExistingAddresseeNumberMap.set(addressNumber, addressNumber);
                 }
             });
         }
 
+        nonExistingAddresseeNumberMap.forEach(function (value, key) {
+            nonExistingAddresseeNumber.push(value);
+        });
+        // 住基情報に存在しない宛名番号を表示
+        if (nonExistingAddresseeNumber.length > 0) {
+            logger.warn("賦課マスタに存在するが、住基情報に存在しない宛名番号が検出されました。");
+            downloadCSV(nonExistingAddresseeNumber.join(","), "賦課マスタに存在するが、住基情報に存在しない宛名番号.csv");
+        }
         /* 0618_住基情報以外の行を無視しない処理（旧処理）。確認が取れ次第削除する
         // 各CSVデータをマッピングしマージ処理を行う
         const map = new Map();
@@ -227,6 +240,9 @@ function mergeCSV() {
             map.set(addressNumber, rowObj);
         });
 
+        // 住基情報に存在しない宛名番号を格納する変数
+        let nonExistingAddresseeNumber = [];
+        let nonExistingAddresseeNumberMap = new Map();
         // 他のCSVデータをマッピングしマージ処理を行う
         for (let fileIndex = 1; fileIndex < parsedCSVs.length; fileIndex++) {
             parsedCSVs[fileIndex].rows.forEach(row => {
@@ -238,10 +254,19 @@ function mergeCSV() {
                         return obj;
                     }, {});
                     map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
+                } else {
+                    nonExistingAddresseeNumberMap.set(addressNumber, addressNumber);
                 }
             });
         }
-
+        nonExistingAddresseeNumberMap.forEach(function (value, key) {
+            nonExistingAddresseeNumber.push(value);
+        });
+        // 住基情報に存在しない宛名番号を表示
+        if (nonExistingAddresseeNumber.length > 0) {
+            logger.warn("税情報、住民票コード、前住所地の住所コードのいずれかに存在するが、住基情報に存在しない宛名番号が検出されました。");
+            downloadCSV(nonExistingAddresseeNumber.join(","), "税情報、住民票コード、前住所地の住所コードのいずれかに存在するが、住基情報に存在しない宛名番号.csv");
+        }
         /* 0618_住基情報以外の行を無視しない処理（旧処理）。確認が取れ次第削除する
         // 各CSVデータをマッピングしマージ処理を行う
         const map = new Map();
@@ -255,7 +280,7 @@ function mergeCSV() {
                 }, {});
                 map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
             });
-        });*/
+        }); */
 
         map.forEach(value => {
             const row = fullHeader.map(header => value[header] || '');
