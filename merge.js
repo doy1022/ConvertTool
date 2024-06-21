@@ -10,7 +10,6 @@ const NO_TAXINFO_FILE = "「税情報なし」対象者.DAT";
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
 
-// todo :必須カラムのエラハン、
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
 function mergeTaxCSV() {
     // 各ファイルのIDを配列に格納する
@@ -29,7 +28,7 @@ function mergeTaxCSV() {
 
     // 処理開始log
     logger.info('STEP 0 処理を開始しました');
-    // showLoading();
+    showLoading();
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
     const readers = files.map(file => new FileReader());
@@ -178,6 +177,12 @@ function mergeCSV() {
     if (!fileNameCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
+    
+    // 税情報ファイルとして、「中間ファイル⓪」がインプットされたことを確認する（前方一致で確認）
+    if (!files[1].name.startsWith('中間ファイル⓪')) {
+        alert('税情報ファイルとしてアップロードするファイル名は「中間ファイル⓪.csv」にして下さい。');
+        return; // ファイル名が「中間ファイル⓪」で始まらない場合はエラーを出して処理終了
+    }
 
     // 処理開始log
     logger.info('STEP 1 処理を開始しました');
@@ -306,6 +311,12 @@ function handleFile() {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
+    // 「中間ファイル①」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル①')) {
+        alert('アップロードするファイル名を「中間ファイル①」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル①」で始まらない場合はエラーを出して処理終了
+    }
+
     // 処理開始log
     logger.info('STEP 2 処理を開始しました');
 
@@ -404,7 +415,7 @@ function handleFile() {
 
             // 除外条件がわかりづらいため変数として定義する
             // 続柄が「02（世帯主）」かつ、住民日がR6.6.3よりあとであるレコード
-            const condition1 = familyRelationship === '02' && residentsDateObj > targetDate;
+            const condition1 = familyRelationship === '02' && residentsDateObj >= targetDate;
             // 消除事由が「「死亡申出（全部）」「死亡通知（全部）」のいずれかであるレコード
             const condition2 = deathReasonCode.includes(reasonCode);
             // 消除事由が、死亡以外の「～（全部）」いずれかで、かつ消除日がR6.6.3より前であるレコード
@@ -475,6 +486,12 @@ function deleteRowsByAddressNumber() {
     const fileNameCheck = filenameCheck(files);
     if (!fileNameCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル②」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル②')) {
+        alert('アップロードするファイル名を「中間ファイル②」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル②」で始まらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
@@ -582,6 +599,12 @@ function deleteRowsByReason() {
     const fileNameCheck = filenameCheck(files);
     if (!fileNameCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル②」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル③')) {
+        alert('アップロードするファイル名を「中間ファイル③」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル③」で始まらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
@@ -779,6 +802,12 @@ function deleteRowAndGenerateInquiryFile() {
     const fileNameCheck = filenameCheck(files);
     if (!fileNameCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル④」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル④')) {
+        alert('アップロードするファイル名を「中間ファイル④」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル④」で始まらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
@@ -1640,15 +1669,36 @@ function processTwoFiles(fileId1, fileId2, processFunc, outputFilename) {
  * @return {string} 課税対象の住民を除外したcsvcsvファイルのデータを文字列化して出力
  */
 function filterTaxExcluded(text) {
-    const lines = text.split('\n').map(line => line.split(','));
-    const headerIndex = lines[0].indexOf('課税区分');
-    if (headerIndex === -1) {
+    const lines = parseCSV(text)
+    const taxClassification = lines.header.indexOf('課税区分');
+    const householdNumIndex = lines.header.indexOf('世帯番号');
+
+    if (taxClassification === -1) {
         throw ('課税区分列が見つかりません。');
     }
-    // filter処理を実施し、indexが0（要するにヘッダー行）と、「課税区分」が「3（課税判定）」ではない行を抽出する
-    const filteredLines = lines.filter((line, index) => index === 0 || line[headerIndex] !== '3');
+
+    if (householdNumIndex === -1) {
+        throw ('世帯番号列が見つかりません。');
+    }
+
+    // 除外対象の世帯番号の値を収集するためのセットを作成する
+    const excludedHouseholdNumSet = new Set();
+
+    // 課税区分が「3」の行の「世帯番号」カラムの値を取得する
+    lines.rows.forEach((line) => {
+        if (line[taxClassification] === '3') {
+            // 「世帯番号」の値をセットに追加する
+            excludedHouseholdNumSet.add(line[householdNumIndex]);
+        }
+    });
+
+    // 収集した世帯番号に属する行を除外する
+    const filteredLines = lines.rows.filter((line) => {
+        return !excludedHouseholdNumSet.has(line[householdNumIndex]);
+    });
+
     // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-    return filteredLines.map(line => line.join(',')).join('\n');
+    return [lines.header.join(','), ...filteredLines.map(line => line.join(','))].join('\n');
 }
 
 /**
@@ -1760,15 +1810,15 @@ class Logger {
 // ログ出力クラスのインスタンス化
 var logger = new Logger(LOG_LEVEL); // 引数以上のレベルのログのみを出力します（infoの場合、debugログは出力されない）
 
-// /**
-//  * ロード中のグルグルを表示
-//  */
-// function showLoading() {
-//     //document.getElementById('load_circle').style.display = "block";
-// }
-// /**
-//  * ロード中のグルグルを非表示
-//  */
-// function hideLoading() {
-//     //document.getElementById('load_circle').style.display = "none";
-// }
+/**
+ * ロード中のグルグルを表示
+ */
+function showLoading() {
+    //document.getElementById('load_circle').style.display = "block";
+}
+/**
+ * ロード中のグルグルを非表示
+ */
+function hideLoading() {
+    //document.getElementById('load_circle').style.display = "none";
+}
