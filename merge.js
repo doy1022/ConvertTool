@@ -28,7 +28,7 @@ function mergeTaxCSV() {
 
     // 処理開始log
     logger.info('STEP 0 処理を開始しました');
-    showLoading();
+    //showLoading();
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
     const readers = files.map(file => new FileReader());
