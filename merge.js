@@ -21,8 +21,8 @@ function mergeTaxCSV() {
     }
 
     // 各ファイルのファイル形式をチェック
-    const fileNameCheck = filenameCheck(files);
-    if (!fileNameCheck) {
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
@@ -173,8 +173,8 @@ function mergeCSV() {
     }
 
     // 各ファイルのファイル形式をチェック
-    const fileNameCheck = filenameCheck(files);
-    if (!fileNameCheck) {
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
     
@@ -334,8 +334,8 @@ function handleFile() {
     }
 
     // 各ファイルのファイル形式をチェック
-    const fileNameCheck = filenameCheck(files);
-    if (!fileNameCheck) {
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
@@ -511,8 +511,8 @@ function deleteRowsByAddressNumber() {
     }
 
     // 各ファイルのファイル形式をチェック
-    const fileNameCheck = filenameCheck(files);
-    if (!fileNameCheck) {
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
@@ -560,8 +560,8 @@ function deleteRowsByAddressNumber() {
         const r5BeneficiaryListHeader = arrayFromR5BeneficiaryList.header;
 
         // 各キーのインデックスを取得
-        const addressNumIndex1 = midFileHeader.indexOf(keys[0]); // 宛名番号のインデックス（中間ファイル）
-        const householdNumIndex1 = midFileHeader.indexOf(keys[1]); // 世帯番号のインデックス（中間ファイル）
+        const addressNumIndex1 = midFileHeader.indexOf(keys[0]); // 宛名番号のインデックス（中間ファイル②）
+        const householdNumIndex1 = midFileHeader.indexOf(keys[1]); // 世帯番号のインデックス（中間ファイル②）
         const addressNumIndex2 = r5BeneficiaryListHeader.indexOf(keys[0]); // 宛名番号のインデックス（R5給付対象者ファイル）
         const householdNumIndex2 = r5BeneficiaryListHeader.indexOf(keys[1]); // 世帯番号のインデックス（R5給付対象者ファイル）
 
@@ -624,8 +624,8 @@ function deleteRowsByReason() {
     }
 
     // 各ファイルのファイル形式をチェック
-    const fileNameCheck = filenameCheck(files);
-    if (!fileNameCheck) {
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
@@ -827,8 +827,8 @@ function deleteRowAndGenerateInquiryFile() {
     }
 
     // 各ファイルのファイル形式をチェック
-    const fileNameCheck = filenameCheck(files);
-    if (!fileNameCheck) {
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
@@ -1611,9 +1611,12 @@ function fileCheck(fileIds) {
     return { check, file_num, files };
 }
 
-/* アップロードされたファイルがCSV形式かを確認する処理 */
-function filenameCheck(files) {
-    let fileNameCheck = false;
+/**
+ * アップロードされたファイルがCSV形式かを確認する処理
+ * @param {string[]} files ファイル名チェックを受けるファイルの配列
+ * @returns {boolean} チェック結果
+ */
+function fileExtensionCheck(files) {
     // 拡張子が.csvでないファイルを格納する配列
     const errorFileNames = [];
 
@@ -1627,10 +1630,10 @@ function filenameCheck(files) {
     // エラーとして拡張子が「.csv」でないファイル名を表示する
     if (errorFileNames.length > 0) {
         alert('以下のファイルの拡張子が「.csv」ではありません。\nアップロードするファイルはCSVファイルを使用して下さい。\n' + errorFileNames.join('\n'));
-    } else {
-        fileNameCheck = true;
+        return false;
     }
-    return fileNameCheck;
+
+    return true;
 }
 
 /* 単一ファイル処理の汎用関数 */
@@ -1694,7 +1697,7 @@ function processTwoFiles(fileId1, fileId2, processFunc, outputFilename) {
 /**
  * 課税対象の住民を除外する関数
  * @param {string} text csvファイルのデータを文字列化して入力
- * @return {string} 課税対象の住民を除外したcsvcsvファイルのデータを文字列化して出力
+ * @return {string} 課税対象の住民を含む世帯の行を除外したデータを文字列化して出力
  */
 function filterTaxExcluded(text) {
     const lines = parseCSV(text)
