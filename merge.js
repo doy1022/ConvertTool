@@ -604,7 +604,7 @@ function deleteRowsByAddressNumber() {
         });
 
         // 二次フィルター：一次フィルターで取得した除外対象の世帯番号を使用し、対象外世帯の世帯員レコードを全て除外する
-        const secondaryFilteredLines = arrayFromMidFile.rows.filter(line => {
+        const secondaryFilteredLines = primaryFilteredLines.rows.filter(line => {
             const householdNum = line[householdNumIndex1].trim();
             return !excludedHouseholdNumSet.has(householdNum);
         });
