@@ -1056,8 +1056,8 @@ function deleteRowAndGenerateInquiryFile() {
 
 // 中間サーバ照会用のファイルを作成する処理（他ステップでも使用する予定のため、Globalのfunctionとして作成した）
 function generateFixedLengthFile(text, procedureCode, personalInfoCode) {
-    const lines = text.split('\n').map(line => line.split(','));
-    const headers = lines[0];
+    const lines = parseCSV(text);
+    const headers = lines.header;
     const toolUseTime = getCurrentTime().replace(/[:.\-\s]/g, '').trim();
 
     // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
@@ -1083,7 +1083,7 @@ function generateFixedLengthFile(text, procedureCode, personalInfoCode) {
     const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
         column10, column11, column12, column13, column14, column15, column16, column17, column18];
 
-    return lines.slice(1).map(line => {
+    return lines.rows.map(line => {
         return columnDefinitions.map(colDef => {
             const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
             if (colDef.padDirection === 'left') {
