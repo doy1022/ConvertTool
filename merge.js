@@ -103,7 +103,7 @@ function mergeTaxCSV() {
         });
         // 住基情報に存在しない宛名番号を表示
         if (nonExistingAddresseeNumber.length > 0) {
-            logger.warn("個人基本マスタに存在するが、賦課マスタに存在しない宛名番号が検出されました。\n件数："+nonExistingAddresseeNumber.length);
+            logger.warn("個人基本マスタに存在するが、賦課マスタに存在しない宛名番号が検出されました。\n件数：" + nonExistingAddresseeNumber.length);
             downloadCSV(nonExistingAddresseeNumber.join('\r\n'), "個人基本マスタに存在するが、賦課マスタに存在しない宛名番号.csv");
         }
         /* 0618_住基情報以外の行を無視しない処理（旧処理）。確認が取れ次第削除する
@@ -177,7 +177,7 @@ function mergeCSV() {
     if (!extensionCheck) {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
-    
+
     // 税情報ファイルとして、「中間ファイル⓪」がインプットされたことを確認する（前方一致で確認）
     if (!files[1].name.startsWith('中間ファイル⓪')) {
         alert('税情報ファイルとしてアップロードするファイル名は「中間ファイル⓪.csv」にして下さい。');
@@ -267,14 +267,14 @@ function mergeCSV() {
                     }, {});
                     map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
                 } else {
-                    if(fileIndex==1){
+                    if (fileIndex == 1) {
                         nonExistingAddresseeNumberMap1.set(addressNumber, addressNumber);
-                    }else if(fileIndex==2){
+                    } else if (fileIndex == 2) {
                         nonExistingAddresseeNumberMap2.set(addressNumber, addressNumber);
-                    }else if(fileIndex==3){
+                    } else if (fileIndex == 3) {
                         nonExistingAddresseeNumberMap3.set(addressNumber, addressNumber);
                     }
-                        
+
                 }
             });
         }
@@ -289,15 +289,15 @@ function mergeCSV() {
         });
         // 住基情報に存在しない宛名番号を表示
         if (nonExistingAddresseeNumber1.length > 0) {
-            logger.warn("税情報に存在するが、住基情報に存在しない宛名番号が検出されました。\n件数："+nonExistingAddresseeNumber1.length);
+            logger.warn("税情報に存在するが、住基情報に存在しない宛名番号が検出されました。\n件数：" + nonExistingAddresseeNumber1.length);
             downloadCSV(nonExistingAddresseeNumber1.join('\r\n'), "税情報に存在するが、住基情報に存在しない宛名番号.csv");
         }
         if (nonExistingAddresseeNumber2.length > 0) {
-            logger.warn("住民票コードに存在するが、住基情報に存在しない宛名番号が検出されました。\n件数："+nonExistingAddresseeNumber2.length);
+            logger.warn("住民票コードに存在するが、住基情報に存在しない宛名番号が検出されました。\n件数：" + nonExistingAddresseeNumber2.length);
             downloadCSV(nonExistingAddresseeNumber2.join('\r\n'), "住民票コードに存在するが、住基情報に存在しない宛名番号.csv");
         }
         if (nonExistingAddresseeNumber3.length > 0) {
-            logger.warn("前住所地の住所コードに存在するが、住基情報に存在しない宛名番号が検出されました。\n件数："+nonExistingAddresseeNumber3.length);
+            logger.warn("前住所地の住所コードに存在するが、住基情報に存在しない宛名番号が検出されました。\n件数：" + nonExistingAddresseeNumber3.length);
             downloadCSV(nonExistingAddresseeNumber3.join('\r\n'), "前住所地の住所コードに存在するが、住基情報に存在しない宛名番号.csv");
         }
         /* 0618_住基情報以外の行を無視しない処理（旧処理）。確認が取れ次第削除する
@@ -565,7 +565,6 @@ function deleteRowsByAddressNumber() {
         const addressNumIndex2 = r5BeneficiaryListHeader.indexOf(keys[0]); // 宛名番号のインデックス（R5給付対象者ファイル）
         const householdNumIndex2 = r5BeneficiaryListHeader.indexOf(keys[1]); // 世帯番号のインデックス（R5給付対象者ファイル）
 
-
         // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
         const missingColumns = [];
         if (addressNumIndex1 === -1) {
@@ -587,9 +586,9 @@ function deleteRowsByAddressNumber() {
 
         // 一次フィルター：除外対象の住民レコードを、宛名番号をキーにして取得する
         // R5給付対象者のCSVファイルの宛名番号セットを作成する
-        const addressNumberSet = new Set(arrayFromR5BeneficiaryList.rows.map(line => line[addressNumIndex2].trim()));
+        const addressNumberSet = new Set(arrayFromR5BeneficiaryList.rows.map(line => line[addressNumIndex2].trim().padStart(10, '0')));
         // 除外対象の世帯番号の値を収集するためのセットを作成する
-        const excludedHouseholdNumSet = new Set();
+        const excludedHouseholdNumSet = new Set(arrayFromR5BeneficiaryList.rows.map(line => line[householdNumIndex2].trim().padStart(10, '0')));
 
         // 中間ファイルから、宛名番号セット内の値と一致する宛名番号を持つ行（除外対象行）を抽出する
         const primaryFilteredLines = arrayFromMidFile.rows.filter((line) => {
@@ -1614,22 +1613,24 @@ function fileCheck(fileIds) {
 /**
  * アップロードされたファイルがCSV形式かを確認する処理
  * @param {string[]} files ファイル名チェックを受けるファイルの配列
+ * @param {boolean} allowDat ファイルの拡張子が.datを許可するかどうか
  * @returns {boolean} チェック結果
  */
-function fileExtensionCheck(files) {
-    // 拡張子が.csvでないファイルを格納する配列
+function fileExtensionCheck(files, allowDat = false) {
+    // 拡張子が.csvまたは.datでないファイルを格納する配列
     const errorFileNames = [];
 
     // 各ファイルの拡張子をチェック
     files.forEach(file => {
-        if (!file.name.endsWith('.csv')) {
+        if (!file.name.endsWith('.csv') && !(allowDat && file.name.endsWith('.dat'))) {
             errorFileNames.push(file.name);
         }
     });
 
-    // エラーとして拡張子が「.csv」でないファイル名を表示する
+    // エラーとして拡張子が「.csv」または「.dat」でないファイル名を表示する
     if (errorFileNames.length > 0) {
-        alert('以下のファイルの拡張子が「.csv」ではありません。\nアップロードするファイルはCSVファイルを使用して下さい。\n' + errorFileNames.join('\n'));
+        let datMessage = allowDat ? ['または「.dat」', 'またはDATファイル'] : ['', ''];
+        alert('以下のファイルの拡張子が「.csv」' + datMessage[0] + 'ではありません。\nアップロードするファイルはCSVファイル' + datMessage[1] + 'を使用して下さい。\n' + errorFileNames.join('\n'));
         return false;
     }
 
