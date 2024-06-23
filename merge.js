@@ -498,7 +498,7 @@ function handleFile() {
             return line;
         });
 
-        return [header.join(','), ...finalFilteredLines.map(line => line.join(','))].join('\r\n');
+        return [header.join(','), ...finalFilteredLines.map(line => line.join(','))].join('\r\n') + '\r\n';
     }
 }
 
@@ -907,8 +907,8 @@ function deleteRowAndGenerateInquiryFile() {
                 '漢字氏名',
                 '生年月日',
                 '性別',
-                '届出日',
                 '異動日',
+                '届出日',
                 '異動事由コード', //このカラムは、抽出判定時にもファイル作成時にも使用する
                 '住民日',
                 '住民届出日',
@@ -1007,8 +1007,8 @@ function deleteRowAndGenerateInquiryFile() {
             '漢字氏名',
             '生年月日',
             '性別',
-            '届出日',
             '異動日',
+            '届出日',
             '異動事由コード',
             '住民日',
             '住民届出日',
@@ -1630,7 +1630,7 @@ function fileExtensionCheck(files, allowDat = false) {
     // エラーとして拡張子が「.csv」または「.dat」でないファイル名を表示する
     if (errorFileNames.length > 0) {
         let datMessage = allowDat ? ['または「.dat」', 'またはDATファイル'] : ['', ''];
-        alert('以下のファイルの拡張子が「.csv」' + datMessage[0] + 'ではありません。\nアップロードするファイルはCSVファイル' + datMessage[1] + 'を使用して下さい。\n' + errorFileNames.join('\n'));
+        alert('以下のファイルの拡張子が「.csv」' + datMessage[0] + 'ではありません。\n' + errorFileNames.join('\n') + '\nアップロードするファイルはCSVファイル' + datMessage[1] + 'を使用して下さい。');
         return false;
     }
 
