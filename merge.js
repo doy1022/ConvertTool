@@ -846,6 +846,11 @@ function deleteRowAndGenerateInquiryFile() {
     const reader = new FileReader();
     reader.onload = function (e) {
         try {
+            // 全ての処理が完了したら、結果をダウンロードする
+            let filteredTextFlg = false;
+            let filterPreviousPrefectCodeTextFlg = false;
+            let filterNaturalizedCitizenTextFlg = false;
+
             // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
             let text = e.target.result;
 
@@ -872,7 +877,7 @@ function deleteRowAndGenerateInquiryFile() {
             if (!filteredText) {
                 logger.warn('■ファイル名：' + NO_TAXINFO_FILE + ' >> 出力対象レコードが存在しませんでした。');
             } else {
-                downloadCSV(filteredText, NO_TAXINFO_FILE, true);
+                filteredTextFlg = true;
             }
 
             // 元STEP6 //
@@ -896,7 +901,7 @@ function deleteRowAndGenerateInquiryFile() {
             if (!filterPreviousPrefectCodeText) {
                 logger.warn('■ファイル名：' + RESIDENTINFO_INQUIRY_FILE_1 + ' >> 出力対象レコードが存在しませんでした。');
             } else {
-                downloadCSV(filterPreviousPrefectCodeText, RESIDENTINFO_INQUIRY_FILE_1);
+                filterPreviousPrefectCodeTextFlg = true;
             }
 
             // 元STEP7 //
@@ -935,15 +940,25 @@ function deleteRowAndGenerateInquiryFile() {
             if (!filterNaturalizedCitizenText) {
                 logger.warn('■ファイル名：' + NATURALIZED_CITIZEN_FILE + ' >> 出力対象レコードが存在しませんでした。');
             } else {
-                downloadCSV(filterNaturalizedCitizenText, NATURALIZED_CITIZEN_FILE);
+                filterNaturalizedCitizenTextFlg = true;
             }
 
+            // 各ファイルをダウンロード            
+            if (filteredTextFlg) {
+                downloadCSV(filteredText, NO_TAXINFO_FILE);
+            }
+            if (filterPreviousPrefectCodeTextFlg) {
+                downloadCSV(filterPreviousPrefectCodeText, RESIDENTINFO_INQUIRY_FILE_1);
+            }
+            if (filterNaturalizedCitizenTextFlg) {
+                downloadCSV(filterNaturalizedCitizenText, NATURALIZED_CITIZEN_FILE);
+            }
         } catch (error) {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
             logger.info('STEP 5 処理を終了しました');
-            hideLoading();
+            //hideLoading();
         }
     };
     // onloadイベントを発火
