@@ -6,7 +6,6 @@ const MIDDLE_FILE_2 = "中間ファイル②.csv";
 const MIDDLE_FILE_3 = "中間ファイル③.csv";
 const MIDDLE_FILE_4 = "中間ファイル④.csv";
 const MIDDLE_FILE_5 = "中間ファイル⑤.csv";
-const NO_TAXINFO_FILE = "P640R110_" + getCurrentTime().replace(/[:.\-\s]/g, '').trim().slice(0, 14); // 税情報照会用ファイル（YYYYMMDDHHmmssの14桁）
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
 const NUMBER_OF_DATA_DIVISION = 10000; // 税情報データ分割数
@@ -605,7 +604,7 @@ function deleteRowsByAddressNumber() {
         });
 
         // 二次フィルター：一次フィルターで取得した除外対象の世帯番号を使用し、対象外世帯の世帯員レコードを全て除外する
-        const secondaryFilteredLines = primaryFilteredLines.rows.filter(line => {
+          const secondaryFilteredLines = arrayFromMidFile.rows.filter(line => {
             const householdNum = line[householdNumIndex1].trim();
             return !excludedHouseholdNumSet.has(householdNum);
         });
@@ -821,6 +820,8 @@ function deleteRowsByReason() {
 function deleteRowAndGenerateInquiryFile() {
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file9'];
+    // 出力ファイル名を定義する
+    const noTaxinfoFile = "P640R110_" + getCurrentTime().replace(/[:.\-\s]/g, '').trim().slice(0, 14); // 税情報照会用ファイル（YYYYMMDDHHmmssの14桁）
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
@@ -875,7 +876,7 @@ function deleteRowAndGenerateInquiryFile() {
             // ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外（一つのfunctionにまとめています）
             const filteredText = FilterTaxAndAddressAndMovementReason(columnIndices, header, rows);
             if (!filteredText) {
-                logger.warn('■ファイル名：' + NO_TAXINFO_FILE + ' >> 出力対象レコードが存在しませんでした。');
+                logger.warn('■ファイル名：' + noTaxinfoFile + ' >> 出力対象レコードが存在しませんでした。');
             } else {
                 filteredTextFlg = true;
             }
@@ -945,7 +946,7 @@ function deleteRowAndGenerateInquiryFile() {
 
             // 各ファイルをダウンロード            
             if (filteredTextFlg) {
-                downloadCSV(filteredText, NO_TAXINFO_FILE);
+                downloadCSV(filteredText, noTaxinfoFile, true);
             }
             if (filterPreviousPrefectCodeTextFlg) {
                 downloadCSV(filterPreviousPrefectCodeText, RESIDENTINFO_INQUIRY_FILE_1);
@@ -1113,8 +1114,8 @@ function generateFixedLengthFile(text, procedureCode, personalInfoCode) {
                 return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
             }
         }).join(',');
-        // downloadCSVにて最終行の改行を付与するため、ここでは改行（'\r\n'）を付与しない
     }).join('\r\n');
+    // downloadCSVにて最終行の改行を付与するため、ここでは最終行の改行（ + '\r\n'）を付与しない
 }
 
 /* 6. 住基照会用ファイル①を出力する処理 */
@@ -1754,6 +1755,7 @@ function filterTaxExcluded(text) {
  * CSVファイルのダウンロード処理
  * @param {string} content csvファイルのデータを文字列化して入力
  * @param {string} filename 出力するファイルのファイル名
+ * @param {boolean} splitRows 出力ファイルを行数で分割するかどうか（デフォルト値はfalse）
  */
 
 function downloadCSV(content, filename, splitRows = false) {
