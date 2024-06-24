@@ -6,9 +6,10 @@ const MIDDLE_FILE_2 = "中間ファイル②.csv";
 const MIDDLE_FILE_3 = "中間ファイル③.csv";
 const MIDDLE_FILE_4 = "中間ファイル④.csv";
 const MIDDLE_FILE_5 = "中間ファイル⑤.csv";
-const NO_TAXINFO_FILE = "「税情報なし」対象者.DAT";
+const NO_TAXINFO_FILE = "P640R110_" + getCurrentTime().replace(/[:.\-\s]/g, '').trim().slice(0, 14); // 税情報照会用ファイル（YYYYMMDDHHmmssの14桁）
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
+const NUMBER_OF_DATA_DIVISION = 10000; // 税情報データ分割数
 
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
 function mergeTaxCSV() {
@@ -871,7 +872,7 @@ function deleteRowAndGenerateInquiryFile() {
             if (!filteredText) {
                 logger.warn('■ファイル名：' + NO_TAXINFO_FILE + ' >> 出力対象レコードが存在しませんでした。');
             } else {
-                downloadCSV(filteredText, NO_TAXINFO_FILE);
+                downloadCSV(filteredText, NO_TAXINFO_FILE, true);
             }
 
             // 元STEP6 //
@@ -1097,7 +1098,8 @@ function generateFixedLengthFile(text, procedureCode, personalInfoCode) {
                 return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
             }
         }).join(',');
-    }).join('\r\n') + '\r\n';
+        // downloadCSVにて最終行の改行を付与するため、ここでは改行（'\r\n'）を付与しない
+    }).join('\r\n');
 }
 
 /* 6. 住基照会用ファイル①を出力する処理 */
@@ -1738,15 +1740,33 @@ function filterTaxExcluded(text) {
  * @param {string} content csvファイルのデータを文字列化して入力
  * @param {string} filename 出力するファイルのファイル名
  */
-function downloadCSV(content, filename) {
-    const blob = new Blob([content], { type: 'text/csv' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    document.getElementById('btn_audio').play();
+
+function downloadCSV(content, filename, splitRows = false) {
+    // 第三引数がtrueの場合、データを分割してダウンロードする
+    if (splitRows) {
+        // データを行ごとに分割する
+        const rows = content.split('\r\n');
+        // データを分割する数を指定する
+        for (let i = 0; i < rows.length; i += NUMBER_OF_DATA_DIVISION) {
+            const division = rows.slice(i, i + NUMBER_OF_DATA_DIVISION).join('\r\n') + '\r\n';
+            const divisionFilename = filename + "_" + ((i / NUMBER_OF_DATA_DIVISION + 1).toString().padStart(4, '0')) + ".DAT";
+            const blob = new Blob([division], { type: 'text/csv' });
+            downloadBlob(blob, divisionFilename);
+        }
+    } else {
+        const blob = new Blob([content], { type: 'text/csv' });
+        downloadBlob(blob, filename);
+    }
+
+    function downloadBlob(blob, fileName) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        document.getElementById('btn_audio').play();
+    }
 }
 
 /**
