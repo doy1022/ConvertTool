@@ -10,6 +10,7 @@ const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
 const NUMBER_OF_DATA_DIVISION = 10000; // 税情報データ分割数
 
+// todo カラム不備のエラハン
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
 function mergeTaxCSV() {
     // 各ファイルのIDを配列に格納する
@@ -162,6 +163,7 @@ function mergeTaxCSV() {
     }
 }
 
+// todo カラム不備のエラハン
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
     // 各ファイルのIDを配列に格納する
@@ -604,7 +606,7 @@ function deleteRowsByAddressNumber() {
         });
 
         // 二次フィルター：一次フィルターで取得した除外対象の世帯番号を使用し、対象外世帯の世帯員レコードを全て除外する
-          const secondaryFilteredLines = arrayFromMidFile.rows.filter(line => {
+        const secondaryFilteredLines = arrayFromMidFile.rows.filter(line => {
             const householdNum = line[householdNumIndex1].trim();
             return !excludedHouseholdNumSet.has(householdNum);
         });
@@ -937,6 +939,7 @@ function deleteRowAndGenerateInquiryFile() {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
             }
 
+            // todo 警告文、ヘッダーのみ出力の場合にも出すように改修する
             const filterNaturalizedCitizenText = filterChangeReasonCode(columnIndices, rows);
             if (!filterNaturalizedCitizenText) {
                 logger.warn('■ファイル名：' + NATURALIZED_CITIZEN_FILE + ' >> 出力対象レコードが存在しませんでした。');
@@ -1323,70 +1326,131 @@ function generateFixedLengthFile(text, procedureCode, personalInfoCode) {
 //     }
 // }
 
-
-
-/* 11. 税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルの値によって課税/非課税か更新をかける処理 */
+/* 6.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルの値によって課税/非課税/均等割の更新をかける処理 */
 function updateFukaByAtenaNumber() {
-    processTwoFiles('file15', 'file16', updateheaderless, '中間ファイル⑧.csv');
-}
-
-function updateheaderless(csvText1, csvText2) {
-
-    const fileInput1 = document.getElementById('file15');
-    const fileInput2 = document.getElementById('file16');
-
-    fileInput1.addEventListener('change', handleFileSelect);
-    fileInput2.addEventListener('change', handleFileSelect);
-
-    function handleFileSelect(event) {
-        const selectedFile = event.target.files[0];
-        if (!selectedFile) return; // ファイルが選択されていない場合は処理を中断
-
-        const allowedFileName = event.target.id === 'file15' ? '中間ファイル⑤.csv' : '番号連携照会結果.csv';
-
-        if (selectedFile.name !== allowedFileName) {
-            alert(`正しいファイルをアップロードしてください。(${allowedFileName} をアップロードしてください)`);
-            event.target.value = ''; // ファイル選択ボックスをクリア
-        }
+    const fileIds = ['file15', 'file16'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
     }
 
-    //ここから既存処理
-    var lines1 = csvText1.split('\n').map(function (line) {
-        return line.split(',');
-    });
-    var lines2 = csvText2.split('\n').map(function (line) {
-        return line.split(',');
-    });
-
-    // ヘッダー行を取得
-    var headers1 = lines1[0];
-    // 宛名番号と課税区分のインデックスを取得
-    var atenaIndex1 = headers1.indexOf('宛名番号');
-    var fukaIndex1 = headers1.indexOf('課税区分');
-
-    var atenaIndex2 = 0; // ヘッダー無しファイルの宛名番号はインデックス0
-    var kazeiIndex2 = 1; // ヘッダー無しファイルの課税額はインデックス1
-
-    // 宛名番号をキーに課税額をマップにする
-    var kazeiMap = {};
-    lines2.forEach(function (line) {
-        kazeiMap[line[atenaIndex2].trim()] = line[kazeiIndex2].trim();
-    });
-
-    // 宛名番号に対応する課税区分を更新
-    for (var i = 1; i < lines1.length; i++) {
-        var atenaNumber = lines1[i][atenaIndex1].trim();
-        if (kazeiMap.hasOwnProperty(atenaNumber)) {
-            var kazeiValue = kazeiMap[atenaNumber];
-            lines1[i][fukaIndex1] = kazeiValue === '0' ? '非課税' : (kazeiValue ? '課税対象' : '');
-        }
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files, true);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」もしくは「.DAT」で終わらない場合はエラーを出して処理終了
     }
 
-    // 更新されたCSVを文字列に戻す
-    return lines1.map(function (line) {
-        return line.join(',');
-    }).join('\n');
+    // 「中間ファイル④」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル④')) {
+        alert('アップロードするファイル名を「中間ファイル④」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル④」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 6 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    const updateTaxInfo = updateTaxInfoByInquiryResult(results[0], results[1]);
+                    downloadCSV(updateTaxInfo, MIDDLE_FILE_5);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 6 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+
+    function updateTaxInfoByInquiryResult(csvText1, csvText2) {
+        // CSVテキストを行ごとに分割して配列に変換
+        const arrayFromMidFile = parseCSV(csvText1);
+        // 税情報照会結果はヘッダーがなくparceCSVが使えないため、直接解析処理を行う
+        const arrayFromInquiryResult = csvText2
+            .split('\n')                // split()メソッドを使用して、CSVファイルの行を'\n'（改行）単位で分解
+            .map(line => line.trim())   // 各行の前後に空白文字がある場合削除
+            .filter(line => line)       // 空行がある場合削除
+            .map(line => {
+                return line.split(',').map(field => {           // 各行をカンマ , で分割してフィールドに分ける
+                    return field.replace(/^"|"$/g, '').trim();  //各フィールドの前後に引用符（"）がある場合削除し、前後の空白も削除
+                });
+            });
+
+        // ヘッダー行を取得
+        const midFileHeader = arrayFromMidFile.header;
+
+        // 中間ファイル④の必要カラムindexを指定する
+        const addressNumIndex1 = midFileHeader.indexOf('宛名番号');
+        const taxClassIndex = midFileHeader.indexOf('課税区分');
+        // 税情報照会結果ファイルの必要カラムindexを指定する
+        const addressNumIndex2 = 1; // 2列目（宛名番号）を指定
+        const incomePercentageIndex = 271; // 272列目（所得割額）を指定
+        const equalBracketIndex = 247; // 248列目（均等割額）を指定
+
+        // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
+        const missingColumns = [];
+        if (addressNumIndex1 === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (taxClassIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：課税区分');
+        }
+
+        if (missingColumns.length > 0) {
+            throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
+        }
+
+        // 宛名番号をキーにして課税額をマップにする
+        const taxMap = {};
+        arrayFromInquiryResult.forEach(inquiryRow => {
+            const addressNumFromResultFile = inquiryRow[addressNumIndex2];
+            const incomePercentage = inquiryRow[incomePercentageIndex];
+            const equalBracket = inquiryRow[equalBracketIndex];
+            taxMap[addressNumFromResultFile] = [incomePercentage, equalBracket]; // 所得割額と均等割額をセットにしてマップに格納する
+        });
+
+        // 中間ファイル④にて、宛名番号に対応する課税区分を更新する
+        arrayFromMidFile.rows.forEach(midRow => {
+            const addressNumFromMidFile = midRow[addressNumIndex1];
+            if (taxMap.hasOwnProperty(addressNumFromMidFile)) {
+                const incomePercentage = taxMap[addressNumFromMidFile][0];
+                const equalBracket = taxMap[addressNumFromMidFile][1];
+
+                // 「所得割額」が0かつ、「均等割額」が0であるものを非課税(1)判定
+                if (incomePercentage == 0 && equalBracket == 0) {
+                    value['課税区分'] = '1';
+                    // 「所得割額」が0かつ、「均等割額」が1以上であるものを均等割りのみ課税(2)判定
+                } else if (incomePercentage == 0 && equalBracket > 0) {
+                    value['課税区分'] = '2';
+                    // 「所得割額」が1以上かつ、「均等割額」が1以上であるものを課税(3)判定
+                } else if (incomePercentage > 0 && equalBracket > 0) {
+                    value['課税区分'] = '3';
+                    // 「所得割額」が1以上のときは「均等割額」が1以上になるはずのため、「均等割額」が0のものはエラーとして投げる
+                } else if (incomePercentage > 0 && equalBracket == 0) {
+                    throw new Error('【宛名番号：' + String(taxMap[addressNumFromMidFile]) + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
+                } else {
+                    value['課税区分'] = '';
+                }
+            }
+        });
+
+        // フィルタリングされた行をCSV形式に戻す
+        return [midFileHeader, ...arrayFromMidFile].map(line => line.join(',')).join('\r\n') + '\r\n';
+    }
 }
+
 
 /* 12. 税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする */
 // 2つのファイルをマージし、税区分コードを追加する関数
