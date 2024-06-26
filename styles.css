@@ -43,3 +43,77 @@
 .log-error {
     color: red;
 }
+
+
+/* ▼タブ機能の掲載領域の装飾(※必須ではありません) */
+.tabbox {
+    margin: 0;
+    padding: 1em;
+    background-color: #f2f2f2;
+    border: 1px solid #dcdcdc;
+    border-radius: 0.5em;
+}
+
+/* ▼タブ機能を制御するラジオボタン(非表示にする) */
+.tabbox .tabBtn {
+    display: none;
+}
+
+/* ▼タブ(共通装飾＋非選択状態の装飾) */
+.tab {
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    border-radius: 0.5em 0.5em 0 0;
+    padding: 0.75em 1em;
+    color: #555;
+    background-color: #fafafa;
+    font-weight: bold;
+    margin-right: 0.5em;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* ▼タブにマウスポインタが載った際の装飾 */
+.tab:hover {
+    background-color: #e6e6e6;
+    color: #333;
+    cursor: pointer;
+}
+
+/* ▼チェックが入っているラジオボタンの隣にあるタブの装飾(＝選択状態のタブ) */
+input:checked + .tab {
+    color: #fff;
+    background-color: #007BFF;
+    position: relative;
+    z-index: 10;
+    border-color: #007BFF;
+}
+
+/* ▼タブの中身(共通装飾＋非選択状態の装飾) */
+.tabcontent {
+    display: none;
+    border: 1px solid #dcdcdc;
+    padding: 1em;
+    position: relative;
+    z-index: 0;
+    background-color: #fff;
+    border-radius: 0 0 0.5em 0.5em;
+    animation: fadeIn 0.5s;
+}
+
+/* ▼チェックが入っているラジオボタンに対応するタブの中身を表示する */
+#tabcheck1:checked ~ #tabcontent1,
+#tabcheck2:checked ~ #tabcontent2,
+#tabcheck3:checked ~ #tabcontent3 {
+    display: block;
+}
+
+/* ▼アニメーション */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
