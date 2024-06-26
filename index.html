@@ -13,156 +13,127 @@
 
 <body>
     <div class="tools-container">
-        <h1>0.賦課マスタ・個人基本マスタをマージする</h1>
-        <form id="csvForm0">
-            <label for="LevyMaster">賦課マスタをアップロードして下さい:</label>
-            <input type="file" id="LevyMaster" accept=".csv"><br><br>
-            <label for="PersonalMaster">個人基本マスタをアップロードして下さい:</label>
-            <input type="file" id="PersonalMaster" accept=".csv"><br><br>
-            <button type="button" onclick="mergeTaxCSV()">中間ファイル⓪を作成する</button>
-        </form>
+    <div class="tabbox">
+    <input type="radio" name="tabset" id="tabcheck1" class="tabBtn" checked><label for="tabcheck1" class="tab">タブ1</label>
+    <input type="radio" name="tabset" id="tabcheck2" class="tabBtn"><label for="tabcheck2" class="tab">タブ2</label>
+    <input type="radio" name="tabset" id="tabcheck3" class="tabBtn"><label for="tabcheck3" class="tab">タブ3</label>
+            <div class="tabcontent" id="tabcontent1">
+                <h1>0.賦課マスタ・個人基本マスタをマージする</h1>
+                <form id="csvForm0">
+                    <label for="LevyMaster">賦課マスタをアップロードして下さい:</label>
+                    <input type="file" id="LevyMaster" accept=".csv"><br><br>
+                    <label for="PersonalMaster">個人基本マスタをアップロードして下さい:</label>
+                    <input type="file" id="PersonalMaster" accept=".csv"><br><br>
+                    <button type="button" onclick="mergeTaxCSV()">中間ファイル⓪を作成する</button>
+                </form>
 
-        <h1>1.住基情報・税情報・住民票コード・前住所地の住所コードを、宛名番号をキーにしてマージする</h1>
-        <form id="csvForm1">
-            <label for="file1">住基情報ファイルをアップロードして下さい:</label>
-            <input type="file" id="file1" accept=".csv"><br><br>
-            <label for="file2">中間ファイル⓪をアップロードして下さい:</label>
-            <input type="file" id="file2" accept=".csv"><br><br>
-            <label for="file3">住民票コードをアップロードして下さい:</label>
-            <input type="file" id="file3" accept=".csv"><br><br>
-            <label for="file4">前住所地の住所コードをアップロードして下さい:</label>
-            <input type="file" id="file4" accept=".csv"><br><br>
-            <button type="button" onclick="mergeCSV()">中間ファイル①を作成する</button>
-        </form>
+                <h1>1.住基情報・税情報・住民票コード・前住所地の住所コードを、宛名番号をキーにしてマージする</h1>
+                <form id="csvForm1">
+                    <label for="file1">住基情報ファイルをアップロードして下さい:</label>
+                    <input type="file" id="file1" accept=".csv"><br><br>
+                    <label for="file2">中間ファイル⓪をアップロードして下さい:</label>
+                    <input type="file" id="file2" accept=".csv"><br><br>
+                    <label for="file3">住民票コードをアップロードして下さい:</label>
+                    <input type="file" id="file3" accept=".csv"><br><br>
+                    <label for="file4">前住所地の住所コードをアップロードして下さい:</label>
+                    <input type="file" id="file4" accept=".csv"><br><br>
+                    <button type="button" onclick="mergeCSV()">中間ファイル①を作成する</button>
+                </form>
 
-        <h1>2.課税対象の住民・消除済住民・住民日がR6.6.4～の住民を除外する</h1>
-        <form id="csvForm2">
-            <label for="csvFile1">中間ファイル①をアップロードして下さい:</label>
-            <input type="file" id="midFile1" accept=".csv"><br><br>
-            <button type="button" onclick="handleFile()">中間ファイル②を作成する</button>
-        </form>
+                <h1>2.課税対象の住民・消除済住民・住民日がR6.6.4～の住民を除外する</h1>
+                <form id="csvForm2">
+                    <label for="csvFile1">中間ファイル①をアップロードして下さい:</label>
+                    <input type="file" id="midFile1" accept=".csv"><br><br>
+                    <button type="button" onclick="handleFile()">中間ファイル②を作成する</button>
+                </form>
 
-        <!--h1>3.死亡している住民を除外する</h1>
-        <form id="csvForm3">
-            <label for="csvFile2">中間ファイル②をアップロードして下さい:</label>
-            <input type="file" id="csvFile2" accept=".csv"><br><br>
-            <button type="button" onclick="filterDeath()">中間ファイル③を作成する</button>
-        </form-->
+                <h1>3.R5給付対象者を宛名番号・世帯番号をキーとして除外する</h1>
+                <form id="csvForm4">
+                    <label for="file5">中間ファイル②をアップロードして下さい:</label>
+                    <input type="file" id="file5" accept=".csv"><br><br>
+                    <label for="file6">R5給付対象者ファイルをアップロードして下さい:</label>
+                    <input type="file" id="file6" accept=".csv"><br><br>
+                    <button type="button" onclick="deleteRowsByAddressNumber()">中間ファイル③を作成する</button>
+                </form>
 
-        <h1>3.R5給付対象者を宛名番号・世帯番号をキーとして除外する</h1>
-        <form id="csvForm4">
-            <label for="file5">中間ファイル②をアップロードして下さい:</label>
-            <input type="file" id="file5" accept=".csv"><br><br>
-            <label for="file6">R5給付対象者ファイルをアップロードして下さい:</label>
-            <input type="file" id="file6" accept=".csv"><br><br>
-            <button type="button" onclick="deleteRowsByAddressNumber()">中間ファイル③を作成する</button>
-        </form>
+                <h1>4.廃止事由より「18（他区課税）」の住民を給付対象外として除外する</h1>
+                <form id="csvForm5">
+                    <label for="file7">中間ファイル③をアップロードして下さい:</label>
+                    <input type="file" id="file7" accept=".csv"><br><br>
+                    <label for="file8">廃止事由ファイルをアップロードして下さい:</label>
+                    <input type="file" id="file8" accept=".csv"><br><br>
+                    <button type="button" onclick="deleteRowsByReason()">中間ファイル④を作成する</button>
+                </form>
 
-        <h1>4.廃止事由より「18（他区課税）」の住民を給付対象外として除外する</h1>
-        <form id="csvForm5">
-            <label for="file7">中間ファイル③をアップロードして下さい:</label>
-            <input type="file" id="file7" accept=".csv"><br><br>
-            <label for="file8">廃止事由ファイルをアップロードして下さい:</label>
-            <input type="file" id="file8" accept=".csv"><br><br>
-            <button type="button" onclick="deleteRowsByReason()">中間ファイル④を作成する</button>
-        </form>
+                <h1>5.下記の3ファイルを作成する</h1>
+                <ul>
+                    <li>中間サーバに連携する「税情報無し対象者ファイル」</li>
+                    <li>住基照会用ファイル①</li>
+                    <li>帰化対象者リスト</li>
+                </ul>
+                <form id="csvForm6">
+                    <label for="file9">中間ファイル④をアップロードして下さい:</label>
+                    <input type="file" id="file9" accept=".csv"><br><br>
+                    <button type="button" onclick="deleteRowAndGenerateInquiryFile()">上記3ファイルを作成する</button>
+                </form>
+            </div>
+            <div class="tabcontent" id="tabcontent2">
+                <h1>11.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルをマージする</h1>
+                <form id="csvForm11">
+                    <label for="file15">中間ファイル⑤をアップロードしてください:</label>
+                    <input type="file" id="file15" accept=".csv"><br><br>
+                    <label for="file16">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
+                    <input type="file" id="file16" accept=".csv"><br><br>
+                    <button type="button" onclick="updateFukaByAtenaNumber()">中間ファイル⑧を作成する</button>
+                </form>
 
-        <!--<h1>5. 「転入元都道府県市区町村コード」の値を「情報提供者機関コード」に変換する</h1>
-        <form id="csvForm8">
-            <label for="file11">中間ファイル⑥をアップロードしてください:</label>
-            <input type="file" id="file11" accept=".csv"><br><br>
-            <label for="file12">機関コードファイルをアップロードしてください:</label>
-            <input type="file" id="file12" accept=".csv"><br><br>
-            <button type="button" onclick="ChangeRowsFromInstitutionCode()">中間ファイル⑦を作成する</button>
-        </form>-->
+                <h1>12.税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする</h1>
+                <form id="csvForm12">
+                    <label for="file17">中間ファイル⑧をアップロードしてください:</label>
+                    <input type="file" id="file17" accept=".csv"><br><br>
+                    <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
+                    <input type="file" id="file18" accept=".csv"><br><br>
+                    <button type="button" onclick="taxinfo_naturalization_merge()">中間ファイル⑨を作成する</button>
+                </form>
+            </div>
+            <div class="tabcontent" id="tabcontent3">
+                <h1>13.課税対象の住民を除外する</h1>
+                <form id="csvForm13">
+                    <label for="file19">中間ファイル⑨をアップロードしてください:</label>
+                    <input type="file" id="file19" accept=".csv"><br><br>
+                    <button type="button" onclick="ExcludedFromTaxation()">中間ファイル⑩を作成する</button>
+                </form>
 
-        <h1>5.下記の3ファイルを作成する</h1>
-        <ul>
-            <li>中間サーバに連携する「税情報無し対象者ファイル」</li>
-            <li>住基照会用ファイル①</li>
-            <li>帰化対象者リスト</li>
-        </ul>
-        <form id="csvForm6">
-            <label for="file9">中間ファイル④をアップロードして下さい:</label>
-            <input type="file" id="file9" accept=".csv"><br><br>
-            <button type="button" onclick="deleteRowAndGenerateInquiryFile()">上記3ファイルを作成する</button>
-        </form>
+                <h1>14.税情報無しの住民を除外する</h1>
+                <form id="csvForm14">
+                    <label for="file20">中間ファイル⑩をアップロードしてください:</label>
+                    <input type="file" id="file20" accept=".csv"><br><br>
+                    <button type="button" onclick="ExcludeNoTaxInfo()">中間ファイル⑪を作成する</button>
+                </form>
 
-        <!--<h1>8.抽出した税情報無しの住民リストを、照会ファイルのフォーマットに整える</h1>
-        <form id="csvForm7">
-            <label for="file10">中間ファイル⑦をアップロードしてください:</label>
-            <input type="file" id="file10" accept=".csv"><br><br>
-            <button type="button" onclick="generateTaxInfoInquiryFile()">税情報照会ファイルを作成する</button>
-        </form>-->
+                <h1>15.ファイルを整形し、「均等割りのみ課税」「非課税」対象者ファイルを出力する</h1>
+                <form id="csvForm15">
+                    <label for="file21">中間ファイル⑪をアップロードしてください:</label>
+                    <input type="file" id="file21" accept=".csv"><br><br>
+                    <button type="button" onclick="generateTargetGroupFile()">「均等割りのみ課税」「非課税」対象者ファイルを作成する</button>
+                </form>
 
-        <!--h1>6.住基照会用ファイル①を作成する</h1>
-        <form id="csvForm9">
-            <label for="file13">中間ファイル⑤をアップロードしてください:</label>
-            <input type="file" id="file13" accept=".csv"><br><br>
-            <button type="button" onclick="generatePreviousAddressForeignFile()">住基照会用ファイル①を作成する</button>
-        </form>
+                <h1>16.住基照会用ファイル②（番号連携エラー（税情報なし）の住民のリスト）を作成する</h1>
+                <form id="csvForm16">
+                    <label for="file22">中間ファイル⑩をアップロードしてください:</label>
+                    <input type="file" id="file22" accept=".csv"><br><br>
+                    <button type="button" onclick="generateCitizenIDcheckFile2()">住基照会用ファイル②を作成する</button>
+                </form>
 
-        <h1>7.帰化対象者リストを作成する</h1>
-        <form id="csvForm10">
-            <label for="file14">中間ファイル⑤をアップロードしてください:</label>
-            <input type="file" id="file14" accept=".csv"><br><br>
-            <button type="button" onclick="generateNaturalizedCitizenFile()">帰化対象者リストを作成する</button>
-        </form-->
-
-        <h1>11.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルをマージする</h1>
-        <form id="csvForm11">
-            <label for="file15">中間ファイル⑤をアップロードしてください:</label>
-            <input type="file" id="file15" accept=".csv"><br><br>
-            <label for="file16">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
-            <input type="file" id="file16" accept=".csv"><br><br>
-            <button type="button" onclick="updateFukaByAtenaNumber()">中間ファイル⑧を作成する</button>
-        </form>
-
-        <h1>12.税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする</h1>
-        <form id="csvForm12">
-            <label for="file17">中間ファイル⑧をアップロードしてください:</label>
-            <input type="file" id="file17" accept=".csv"><br><br>
-            <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
-            <input type="file" id="file18" accept=".csv"><br><br>
-            <button type="button" onclick="taxinfo_naturalization_merge()">中間ファイル⑨を作成する</button>
-        </form>
-
-        <h1>13.課税対象の住民を除外する</h1>
-        <form id="csvForm13">
-            <label for="file19">中間ファイル⑨をアップロードしてください:</label>
-            <input type="file" id="file19" accept=".csv"><br><br>
-            <button type="button" onclick="ExcludedFromTaxation()">中間ファイル⑩を作成する</button>
-        </form>
-
-        <h1>14.税情報無しの住民を除外する</h1>
-        <form id="csvForm14">
-            <label for="file20">中間ファイル⑩をアップロードしてください:</label>
-            <input type="file" id="file20" accept=".csv"><br><br>
-            <button type="button" onclick="ExcludeNoTaxInfo()">中間ファイル⑪を作成する</button>
-        </form>
-
-        <h1>15.ファイルを整形し、「均等割りのみ課税」「非課税」対象者ファイルを出力する</h1>
-        <form id="csvForm15">
-            <label for="file21">中間ファイル⑪をアップロードしてください:</label>
-            <input type="file" id="file21" accept=".csv"><br><br>
-            <button type="button" onclick="generateTargetGroupFile()">「均等割りのみ課税」「非課税」対象者ファイルを作成する</button>
-        </form>
-
-        <h1>16.住基照会用ファイル②（番号連携エラー（税情報なし）の住民のリスト）を作成する</h1>
-        <form id="csvForm16">
-            <label for="file22">中間ファイル⑩をアップロードしてください:</label>
-            <input type="file" id="file22" accept=".csv"><br><br>
-            <button type="button" onclick="generateCitizenIDcheckFile2()">住基照会用ファイル②を作成する</button>
-        </form>
-
-        <!--ここから作成前。とりあえず置いてみただけ。あとはfunctionを書けば終わり（Javascript側を一切書いてない）-->
-        <h1>SN.「均等割りのみ課税」「非課税」対象者ファイルを整形し、SNにインポートする給付対象者リストを作成する</h1>
-        <form id="csvForm17">
-            <label for="file23">中間ファイル⑪をアップロードしてください:</label>
-            <input type="file" id="file23" accept=".csv"><br><br>
-            <button type="button" onclick="">SNインポート向け対象者リストを作成する</button>
-        </form>
-
+                <!--ここから作成前。とりあえず置いてみただけ。あとはfunctionを書けば終わり（Javascript側を一切書いてない）-->
+                <h1>SN.「均等割りのみ課税」「非課税」対象者ファイルを整形し、SNにインポートする給付対象者リストを作成する</h1>
+                <form id="csvForm17">
+                    <label for="file23">中間ファイル⑪をアップロードしてください:</label>
+                    <input type="file" id="file23" accept=".csv"><br><br>
+                    <button type="button" onclick="">SNインポート向け対象者リストを作成する</button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <span class="log-container">
