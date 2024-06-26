@@ -13,10 +13,13 @@
 
 <body>
     <div class="tools-container">
-    <div class="tabbox">
-    <input type="radio" name="tabset" id="tabcheck1" class="tabBtn" checked><label for="tabcheck1" class="tab">タブ1</label>
-    <input type="radio" name="tabset" id="tabcheck2" class="tabBtn"><label for="tabcheck2" class="tab">タブ2</label>
-    <input type="radio" name="tabset" id="tabcheck3" class="tabBtn"><label for="tabcheck3" class="tab">タブ3</label>
+        <div class="tabbox">
+            <input type="radio" name="tabset" id="tabcheck1" class="tabBtn" checked><label for="tabcheck1"
+                class="tab">タブ1</label>
+            <input type="radio" name="tabset" id="tabcheck2" class="tabBtn"><label for="tabcheck2"
+                class="tab">タブ2</label>
+            <input type="radio" name="tabset" id="tabcheck3" class="tabBtn"><label for="tabcheck3"
+                class="tab">タブ3</label>
             <div class="tabcontent" id="tabcontent1">
                 <h1>0.賦課マスタ・個人基本マスタをマージする</h1>
                 <form id="csvForm0">
@@ -78,34 +81,34 @@
                 </form>
             </div>
             <div class="tabcontent" id="tabcontent2">
-        <h1>6.番号連携照会結果（税情報）ファイルから課税区分を判別し、中間ファイルを更新する</h1>
-        <form id="csvForm11">
-            <label for="file15">中間ファイル④をアップロードしてください:</label>
-            <input type="file" id="file15" accept=".csv"><br><br>
-            <label for="file16">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
-            <input type="file" id="file16" accept=".csv"><br><br>
-            <button type="button" onclick="updateTaxInfoByInquiryResult()">中間ファイル⑤を作成する</button>
-        </form>
+                <h1>6.番号連携照会結果（税情報）ファイルから課税区分を判別し、中間ファイルを更新する</h1>
+                <form id="csvForm11">
+                    <label for="file15">中間ファイル④をアップロードしてください:</label>
+                    <input type="file" id="file15" accept=".csv"><br><br>
+                    <label for="file16">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
+                    <input type="file" id="file16" accept=".csv"><br><br>
+                    <button type="button" onclick="updateTaxInfoByInquiryResult()">中間ファイル⑤を作成する</button>
+                </form>
 
-        <h1>7.帰化対象者税情報照会用ファイルから課税区分を判別し、中間ファイルを更新する</h1>
-        <form id="csvForm12">
-            <label for="file17">中間ファイル⑤をアップロードしてください:</label>
-            <input type="file" id="file17" accept=".csv"><br><br>
-            <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
-            <input type="file" id="file18" accept=".csv"><br><br>
-            <button type="button" onclick="updateTaxInfoByNaturalizedCitizenFile()">中間ファイル⑥を作成する</button>
-        </form>
+                <h1>7.帰化対象者税情報照会用ファイルから課税区分を判別し、中間ファイルを更新する</h1>
+                <form id="csvForm12">
+                    <label for="file17">中間ファイル⑤をアップロードしてください:</label>
+                    <input type="file" id="file17" accept=".csv"><br><br>
+                    <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
+                    <input type="file" id="file18" accept=".csv"><br><br>
+                    <button type="button" onclick="updateTaxInfoByNaturalizedCitizenFile()">中間ファイル⑥を作成する</button>
+                </form>
 
-        <h1>8.下記の2ファイルを作成する</h1>
-        <ul>
-            <li>中間サーバに連携する「均等割りのみ課税・非課税対象者ファイル」</li>
-            <li>住基照会用ファイル②</li>
-        </ul>
-        <form id="csvForm15">
-            <label for="file21">中間ファイル⑥をアップロードしてください:</label>
-            <input type="file" id="file21" accept=".csv"><br><br>
-            <button type="button" onclick="generateInquiryFiles()">上記2ファイルを作成する</button>
-        </form>
+                <h1>8.下記の2ファイルを作成する</h1>
+                <ul>
+                    <li>中間サーバに連携する「均等割りのみ課税・非課税対象者ファイル」</li>
+                    <li>住基照会用ファイル②</li>
+                </ul>
+                <form id="csvForm15">
+                    <label for="file21">中間ファイル⑥をアップロードしてください:</label>
+                    <input type="file" id="file21" accept=".csv"><br><br>
+                    <button type="button" onclick="generateInquiryFiles()">上記2ファイルを作成する</button>
+                </form>
             </div>
             <div class="tabcontent" id="tabcontent3">
                 <!--ここから作成前。とりあえず置いてみただけ。あとはfunctionを書けば終わり（Javascript側を一切書いてない）-->
