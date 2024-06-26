@@ -78,53 +78,36 @@
                 </form>
             </div>
             <div class="tabcontent" id="tabcontent2">
-                <h1>11.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルをマージする</h1>
-                <form id="csvForm11">
-                    <label for="file15">中間ファイル⑤をアップロードしてください:</label>
-                    <input type="file" id="file15" accept=".csv"><br><br>
-                    <label for="file16">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
-                    <input type="file" id="file16" accept=".csv"><br><br>
-                    <button type="button" onclick="updateFukaByAtenaNumber()">中間ファイル⑧を作成する</button>
-                </form>
+        <h1>6.番号連携照会結果（税情報）ファイルから課税区分を判別し、中間ファイルを更新する</h1>
+        <form id="csvForm11">
+            <label for="file15">中間ファイル④をアップロードしてください:</label>
+            <input type="file" id="file15" accept=".csv"><br><br>
+            <label for="file16">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
+            <input type="file" id="file16" accept=".csv"><br><br>
+            <button type="button" onclick="updateTaxInfoByInquiryResult()">中間ファイル⑤を作成する</button>
+        </form>
 
-                <h1>12.税情報無しの住民を含んだファイルに対し、帰化対象者税情報確認結果ファイルをマージする</h1>
-                <form id="csvForm12">
-                    <label for="file17">中間ファイル⑧をアップロードしてください:</label>
-                    <input type="file" id="file17" accept=".csv"><br><br>
-                    <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
-                    <input type="file" id="file18" accept=".csv"><br><br>
-                    <button type="button" onclick="taxinfo_naturalization_merge()">中間ファイル⑨を作成する</button>
-                </form>
+        <h1>7.帰化対象者税情報照会用ファイルから課税区分を判別し、中間ファイルを更新する</h1>
+        <form id="csvForm12">
+            <label for="file17">中間ファイル⑤をアップロードしてください:</label>
+            <input type="file" id="file17" accept=".csv"><br><br>
+            <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
+            <input type="file" id="file18" accept=".csv"><br><br>
+            <button type="button" onclick="updateTaxInfoByNaturalizedCitizenFile()">中間ファイル⑥を作成する</button>
+        </form>
+
+        <h1>8.下記の2ファイルを作成する</h1>
+        <ul>
+            <li>中間サーバに連携する「均等割りのみ課税・非課税対象者ファイル」</li>
+            <li>住基照会用ファイル②</li>
+        </ul>
+        <form id="csvForm15">
+            <label for="file21">中間ファイル⑥をアップロードしてください:</label>
+            <input type="file" id="file21" accept=".csv"><br><br>
+            <button type="button" onclick="generateInquiryFiles()">上記2ファイルを作成する</button>
+        </form>
             </div>
             <div class="tabcontent" id="tabcontent3">
-                <h1>13.課税対象の住民を除外する</h1>
-                <form id="csvForm13">
-                    <label for="file19">中間ファイル⑨をアップロードしてください:</label>
-                    <input type="file" id="file19" accept=".csv"><br><br>
-                    <button type="button" onclick="ExcludedFromTaxation()">中間ファイル⑩を作成する</button>
-                </form>
-
-                <h1>14.税情報無しの住民を除外する</h1>
-                <form id="csvForm14">
-                    <label for="file20">中間ファイル⑩をアップロードしてください:</label>
-                    <input type="file" id="file20" accept=".csv"><br><br>
-                    <button type="button" onclick="ExcludeNoTaxInfo()">中間ファイル⑪を作成する</button>
-                </form>
-
-                <h1>15.ファイルを整形し、「均等割りのみ課税」「非課税」対象者ファイルを出力する</h1>
-                <form id="csvForm15">
-                    <label for="file21">中間ファイル⑪をアップロードしてください:</label>
-                    <input type="file" id="file21" accept=".csv"><br><br>
-                    <button type="button" onclick="generateTargetGroupFile()">「均等割りのみ課税」「非課税」対象者ファイルを作成する</button>
-                </form>
-
-                <h1>16.住基照会用ファイル②（番号連携エラー（税情報なし）の住民のリスト）を作成する</h1>
-                <form id="csvForm16">
-                    <label for="file22">中間ファイル⑩をアップロードしてください:</label>
-                    <input type="file" id="file22" accept=".csv"><br><br>
-                    <button type="button" onclick="generateCitizenIDcheckFile2()">住基照会用ファイル②を作成する</button>
-                </form>
-
                 <!--ここから作成前。とりあえず置いてみただけ。あとはfunctionを書けば終わり（Javascript側を一切書いてない）-->
                 <h1>SN.「均等割りのみ課税」「非課税」対象者ファイルを整形し、SNにインポートする給付対象者リストを作成する</h1>
                 <form id="csvForm17">
