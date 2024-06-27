@@ -943,26 +943,6 @@ function deleteRowAndGenerateInquiryFile() {
     reader.readAsText(files[0]);
 
     /**
-     * ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理
-     */
-    function FilterTaxAndAddressAndMovementReason(columnIndices, header, rows) {
-        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
-
-        // 条件に合致するレコードのみをフィルタ
-        const filteredLines = rows.filter(line => {
-            const [taxClassification, previousAddressCode, changeReasonCode] = [
-                line[columnIndices[2]],
-                line[columnIndices[3]],
-                line[columnIndices[4]]
-            ];
-            return (taxClassification == '' && previousAddressCode !== '99999' && !validCodes.includes(changeReasonCode));
-        });
-        // generateFixedLengthFileにテキストを渡し、中間サーバに連携する向けにファイル形式を整える
-        // 口座照会用ファイルと仕様は同じだが「事務手続きコード」「情報提供者機関コード」「特定個人情報名コード」が異なるため、引数で値を渡す
-        return generateFixedLengthFile([header.join(','), ...filteredLines.map(line => line.join(','))].join('\r\n'), 'JT01010000000214', 'TM00000000000002');
-    }
-
-    /**
     *  転入元都道府県市区町村コードが「99999」かつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれでもない住民を抽出し、ファイル形式を整える 
     */
     function filterPreviousPrefectCode(columnIndices, rows) {
@@ -1049,7 +1029,7 @@ function deleteRowAndGenerateInquiryFile() {
 }
 
 // 中間サーバ照会用のファイルを作成する処理（他ステップでも使用する予定のため、Globalのfunctionとして作成した）
-function generateFixedLengthFile(text, procedureCode, personalInfoCode, variableAndFixedSwitch= false) {
+function generateFixedLengthFile(text, procedureCode, personalInfoCode, variableAndFixedSwitch = false) {
     const lines = parseCSV(text);
     const headers = lines.header;
     const toolUseTime = getCurrentTime().replace(/[:.\-\s]/g, '').trim();
@@ -1068,8 +1048,8 @@ function generateFixedLengthFile(text, procedureCode, personalInfoCode, variable
     const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
     const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
     // column13は税情報照会用ファイル作成の場合前住所コード（可変）を入力、公金口座照会用ファイル作成の場合「1419900000002200（固定）」を入力するため、デフォルト引数で切り替える
-    const column13 = variableAndFixedSwitch ? {length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right' , value: '1419900000002200'} : 
-    { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right' };
+    const column13 = variableAndFixedSwitch ? { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right', value: '1419900000002200' } :
+        { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right' };
     const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: personalInfoCode };
     const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
     const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
@@ -1102,6 +1082,84 @@ function generateFixedLengthFile(text, procedureCode, personalInfoCode, variable
     // downloadCSVにて最終行の改行を付与するため、ここでは最終行の改行（ + '\r\n'）を付与しない
 }
 
+function outputOnlyErrorRecordDatFile() {
+    const fileIds = ['file10', 'errorFile1'];
+    const noTaxinfoFile = "[only error rows]P640R110_" + getCurrentTime().replace(/[:.\-\s]/g, '').trim().slice(0, 14); // 税情報照会用ファイル（YYYYMMDDHHmmssの14桁）
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル②」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル④')) {
+        alert('アップロードするファイル名を「中間ファイル④」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル②」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 5(ERROR対応) 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    const middle_file_4_str = results[0];
+                    const errorAddress = parseCSV(results[1]);
+                    // 右から10桁のみを取得
+                    const errorAddressNums = errorAddress.rows.map(line => line[0].slice(-10));
+                    // 必要なヘッダーがあるかチェック
+                    const { header, rows } = parseCSV(middle_file_4_str);
+                    var requiredColumns = [
+                        '宛名番号',
+                        '世帯番号',
+                        '課税区分',
+                        '転入元都道府県市区町村コード',
+                        '異動事由コード',
+                        // '情報提供者機関コード' // 20240617_機関コードへの変換処理が不要となったためコメントアウト
+                    ];
+                    var columnIndices = requiredColumns.map(col => header.indexOf(col));
+                    // 足りないカラムをチェック
+                    var missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+                    if (missingColumns.length > 0) {
+                        throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+                    }
+
+                    // ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外（一つのfunctionにまとめています）
+                    const filteredText = FilterTaxAndAddressAndMovementReason(columnIndices, header, rows, errorAddressNums);
+                    if (!filteredText) {
+                        logger.warn('■ファイル名：' + noTaxinfoFile + ' >> 出力対象レコードが存在しませんでした。');
+                    } else {
+                        downloadCSV(filteredText, noTaxinfoFile, true);
+                    }
+
+                    //const mergedCSV = deleteRows(results[0], results[1], ['宛名番号', '世帯番号']);
+                    
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 5(ERROR対応) 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });  
+}
 /* 6. 住基照会用ファイル①を出力する処理 */
 /* 前住所地の住所コードが「99999」である住民を抽出し、「宛名番号,住民票コード」の構成に整形する */
 // function generatePreviousAddressForeignFile() {
@@ -1704,7 +1762,7 @@ function generateInquiryFiles() {
                 line[columnIndices[3]]
             ];
             // 
-            return (taxClassification == ''  && previousAddressCode !== '99999');
+            return (taxClassification == '' && previousAddressCode !== '99999');
         });
 
         // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出する
@@ -1808,6 +1866,33 @@ function filterTaxExcluded(text) {
 
     // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
     return [lines.header.join(','), ...filteredLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+}
+
+/**
+ * ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外処理
+ */
+function FilterTaxAndAddressAndMovementReason(columnIndices, header, rows, errorAddressNums = []) {
+    const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
+
+    // 条件に合致するレコードのみをフィルタ
+    const filteredLines = rows.filter(line => {
+        const [taxClassification, previousAddressCode, changeReasonCode] = [
+            line[columnIndices[2]],
+            line[columnIndices[3]],
+            line[columnIndices[4]]
+        ];
+        // errorAddressNumsの配列が存在する場合のみ、配列に含まれない宛名番号は除外する（エラー対応ステップ向け）
+        if (errorAddressNums.length > 0) {
+            return (taxClassification == '' && previousAddressCode !== '99999' && !validCodes.includes(changeReasonCode) && errorAddressNums.includes(line[columnIndices[0]]));
+        } 
+        // errorAddressNumsの配列が存在しない場合は、STEP5の処理を行う
+        else {
+            return (taxClassification == '' && previousAddressCode !== '99999' && !validCodes.includes(changeReasonCode));
+        }
+    });
+    // generateFixedLengthFileにテキストを渡し、中間サーバに連携する向けにファイル形式を整える
+    // 口座照会用ファイルと仕様は同じだが「事務手続きコード」「情報提供者機関コード」「特定個人情報名コード」が異なるため、引数で値を渡す
+    return generateFixedLengthFile([header.join(','), ...filteredLines.map(line => line.join(','))].join('\r\n'), 'JT01010000000214', 'TM00000000000002');
 }
 
 /**
