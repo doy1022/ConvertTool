@@ -79,6 +79,15 @@
                     <input type="file" id="file9" accept=".csv"><br><br>
                     <button type="button" onclick="deleteRowAndGenerateInquiryFile()">上記3ファイルを作成する</button>
                 </form>
+
+                <h1>【エラー対応】エラー該当者のみの「税情報無し対象者ファイル」を作成する</h1>
+                <form id="csvForm7">
+                    <label for="file10">中間ファイル④をアップロードして下さい:</label>
+                    <input type="file" id="file10" accept=".csv"><br><br>
+                    <label for="errorFile1">エラー該当者の宛名番号ファイル④をアップロードして下さい:</label>
+                    <input type="file" id="errorFile1" accept=".csv"><br><br>
+                    <button type="button" onclick="outputOnlyErrorRecordDatFile()">「税情報無し対象者ファイル」を作成する</button>
+                </form>
             </div>
             <div class="tabcontent" id="tabcontent2">
                 <h1>6.番号連携照会結果（税情報）ファイルから課税区分を判別し、中間ファイルを更新する</h1>
@@ -125,6 +134,7 @@
     <span class="log-container">
         <h1 class="log-title">ログ出力</h1>
         <div id="log-box"></div>
+        <!--button id="log-box">ログをリセット</button-->
     </span>
     <script src="merge.js"></script>
 </body>
