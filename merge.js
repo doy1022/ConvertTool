@@ -1049,7 +1049,7 @@ function deleteRowAndGenerateInquiryFile() {
 }
 
 // 中間サーバ照会用のファイルを作成する処理（他ステップでも使用する予定のため、Globalのfunctionとして作成した）
-function generateFixedLengthFile(text, procedureCode, personalInfoCode, variableAndFixedSwitch= false) {
+function generateFixedLengthFile(text, procedureCode, personalInfoCode, variableAndFixedSwitch = false) {
     const lines = parseCSV(text);
     const headers = lines.header;
     const toolUseTime = getCurrentTime().replace(/[:.\-\s]/g, '').trim();
@@ -1068,8 +1068,8 @@ function generateFixedLengthFile(text, procedureCode, personalInfoCode, variable
     const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
     const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
     // column13は税情報照会用ファイル作成の場合前住所コード（可変）を入力、公金口座照会用ファイル作成の場合「1419900000002200（固定）」を入力するため、デフォルト引数で切り替える
-    const column13 = variableAndFixedSwitch ? {length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right' , value: '1419900000002200'} : 
-    { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right' };
+    const column13 = variableAndFixedSwitch ? { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right', value: '1419900000002200' } :
+        { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right' };
     const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: personalInfoCode };
     const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
     const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
@@ -1356,29 +1356,37 @@ function updateTaxInfoByInquiryResult() {
     });
 
     function updateTaxInfoByNonHeaderFile(csvText1, csvText2) {
+        // 税情報照会ファイルがヘッダー無しファイルのため、ファイル一行目に追加する用のヘッダーを定義する
+        let column = new Array(279).fill('')
+
+        // カラムが最初空文字列で初期化されているため、1から始まるようにする
+        for (let i = 0; i < column.length; i++) {
+            column[i] = i + 1;
+        }
+
+        // 後続処理で使用するカラム名は連番とは別で定義する
+        column[1] = '宛名番号';
+        column[247] = '市町村民税均等割額';
+        column[271] = '市町村民税所得割額（定額減税前）';
+
+        // ヘッダー配列を「,」で区切って税情報照会ファイルの先頭に追加する
+        csvText2 = column.join(',') + '\r\n' + csvText2;
+
         // CSVテキストを行ごとに分割して配列に変換
         const arrayFromMidFile = parseCSV(csvText1);
-        // 税情報照会結果はヘッダーがなくparceCSVが使えないため、直接解析処理を行う
-        const arrayFromInquiryResult = csvText2
-            .split('\n')                // split()メソッドを使用して、CSVファイルの行を'\n'（改行）単位で分解
-            .map(line => line.trim())   // 各行の前後に空白文字がある場合削除
-            .filter(line => line)       // 空行がある場合削除
-            .map(line => {
-                return line.split(',').map(field => {           // 各行をカンマ , で分割してフィールドに分ける
-                    return field.replace(/^"|"$/g, '').trim();  //各フィールドの前後に引用符（"）がある場合削除し、前後の空白も削除
-                });
-            });
+        const arrayFromInquiryResult = parseCSV(csvText2);
 
         // ヘッダー行を取得
         const midFileHeader = arrayFromMidFile.header;
+        const inquiryResultHeader = arrayFromInquiryResult.header;
 
         // 中間ファイル④の必要カラムindexを指定する
         const addressNumIndex1 = midFileHeader.indexOf('宛名番号');
         const taxClassIndex = midFileHeader.indexOf('課税区分');
         // 税情報照会結果ファイルの必要カラムindexを指定する
-        const addressNumIndex2 = 1; // 2列目（宛名番号）を指定
-        const incomePercentageIndex = 271; // 272列目（所得割額）を指定
-        const equalBracketIndex = 247; // 248列目（均等割額）を指定
+        const addressNumIndex2 = inquiryResultHeader.indexOf('宛名番号');
+        const equalBracketIndex = inquiryResultHeader.indexOf('市町村民税均等割額');
+        const incomePercentageIndex = inquiryResultHeader.indexOf('市町村民税所得割額（定額減税前）');
 
         // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
         const missingColumns = [];
@@ -1388,55 +1396,73 @@ function updateTaxInfoByInquiryResult() {
         if (taxClassIndex === -1) {
             missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：課税区分');
         }
+        if (addressNumIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：宛名番号（項番2）');
+        }
+        if (equalBracketIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：市町村民税均等割額（項番248）');
+        }
+        if (incomePercentageIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：市町村民税所得割額（定額減税前）（項番272）');
+        }
 
         if (missingColumns.length > 0) {
             throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
         }
 
-        // 宛名番号をキーにして課税額をマップにする
+        // エラーハンドリング用：中間ファイルの宛名番号をセットにする
+        const midFileAddressNumSet = new Set(arrayFromMidFile.rows.map(row => row[addressNumIndex1]));
+        // エラー対象（中間ファイルに存在せず、税情報照会結果ファイルに存在する宛名番号）のリストを定義する
+        const errorAddressNums = [];
+
+        // 税情報照会結果ファイルの宛名番号をキーにして、均等割額・所得割額をマップにする
         const taxMap = {};
-        arrayFromInquiryResult.forEach(inquiryRow => {
+        arrayFromInquiryResult.rows.forEach(inquiryRow => {
             const addressNumFromResultFile = inquiryRow[addressNumIndex2];
-            const incomePercentage = inquiryRow[incomePercentageIndex];
             const equalBracket = inquiryRow[equalBracketIndex];
-            taxMap[addressNumFromResultFile] = [incomePercentage, equalBracket]; // 所得割額と均等割額をセットにしてマップに格納する
+            const incomePercentage = inquiryRow[incomePercentageIndex];
+
+            // 中間ファイルに存在しない宛名番号がある場合、エラー対象リストに追加する
+            if (!midFileAddressNumSet.has(addressNumFromResultFile)) {
+                errorAddressNums.push(addressNumFromResultFile);
+            }
+
+            taxMap[addressNumFromResultFile] = [equalBracket, incomePercentage]; // 均等割額と所得割額をセットにしてマップに格納する
         });
 
-        // 税情報照会結果ファイルに存在するが中間ファイル④に存在しない宛名番号がある場合エラーを出す
-        const addressNumsFromResultFile = arrayFromInquiryResult.map(inquiryRow => inquiryRow[addressNumIndex2]);
-        const missingAddressNums = addressNumsFromResultFile.filter(addressNum => !taxMap.hasOwnProperty(addressNum));
-        if (missingAddressNums.length > 0) {
-            throw new Error('中間ファイル④に存在しない宛名番号が税情報照会結果ファイルに存在しています。\n宛名番号: ' + missingAddressNums.join(', ') + '\nインプットファイルを確認してください。');
+        // エラー対象の宛名番号が存在する場合、エラーを出力し処理を中断する
+        if (errorAddressNums.length > 0) {
+            throw new Error('以下の宛名番号が中間ファイル④に存在せず、税情報照会結果ファイルに存在しています。\n' + errorAddressNums.join(', ') + '\nインプットファイルを確認してください。');
         }
 
         // 中間ファイル④にて、宛名番号に対応する課税区分を更新する
         arrayFromMidFile.rows.forEach(midRow => {
             const addressNumFromMidFile = midRow[addressNumIndex1];
             if (taxMap.hasOwnProperty(addressNumFromMidFile)) {
-                const incomePercentage = taxMap[addressNumFromMidFile][0];
-                const equalBracket = taxMap[addressNumFromMidFile][1];
-
+                const equalBracket = taxMap[addressNumFromMidFile][0];
+                const incomePercentage = taxMap[addressNumFromMidFile][1];
+                
                 // 「所得割額」が0かつ、「均等割額」が0であるものを非課税(1)判定
                 if (incomePercentage == 0 && equalBracket == 0) {
-                    value['課税区分'] = '1';
+                    midRow[taxClassIndex] = '1';
                     // 「所得割額」が0かつ、「均等割額」が1以上であるものを均等割りのみ課税(2)判定
                 } else if (incomePercentage == 0 && equalBracket > 0) {
-                    value['課税区分'] = '2';
+                    midRow[taxClassIndex] = '2';
                     // 「所得割額」が1以上かつ、「均等割額」が1以上であるものを課税(3)判定
                 } else if (incomePercentage > 0 && equalBracket > 0) {
-                    value['課税区分'] = '3';
+                    midRow[taxClassIndex] = '3';
                     // 「所得割額」が1以上のときは「均等割額」が1以上になるはずのため、「均等割額」が0のものはエラーとして投げる
                 } else if (incomePercentage > 0 && equalBracket == 0) {
-                    throw new Error('【宛名番号：' + String(taxMap[addressNumFromMidFile]) + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
-                    // その他（照会エラーのもの）は後続で再度照会をかけるため、この場では空を返す
+                    throw new Error('【宛名番号：' + String(addressNumFromMidFile) + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
+                    // その他（照会エラーが想定されるもの）はStep8の出力ファイルを使用して再度照会をかけるため、この場では空を返す
                 } else {
-                    value['課税区分'] = '';
+                    midRow[taxClassIndex] = '';
                 }
             }
         });
 
         // フィルタリングされた行をCSV形式に戻す
-        return [midFileHeader, ...arrayFromMidFile].map(line => line.join(',')).join('\r\n') + '\r\n';
+        return [midFileHeader, ...arrayFromMidFile.rows].map(line => line.join(',')).join('\r\n') + '\r\n';
     }
 }
 
@@ -1704,7 +1730,7 @@ function generateInquiryFiles() {
                 line[columnIndices[3]]
             ];
             // 
-            return (taxClassification == ''  && previousAddressCode !== '99999');
+            return (taxClassification == '' && previousAddressCode !== '99999');
         });
 
         // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出する
@@ -1757,14 +1783,14 @@ function fileExtensionCheck(files, allowDat = false) {
 
     // 各ファイルの拡張子をチェック
     files.forEach(file => {
-        if (!file.name.endsWith('.csv') && !(allowDat && file.name.endsWith('.dat'))) {
+        if (!file.name.endsWith('.csv') && !(allowDat && file.name.endsWith('.DAT'))) {
             errorFileNames.push(file.name);
         }
     });
 
     // エラーとして拡張子が「.csv」または「.dat」でないファイル名を表示する
     if (errorFileNames.length > 0) {
-        let datMessage = allowDat ? ['または「.dat」', 'またはDATファイル'] : ['', ''];
+        let datMessage = allowDat ? ['または「.DAT」', 'またはDATファイル'] : ['', ''];
         alert('以下のファイルの拡張子が「.csv」' + datMessage[0] + 'ではありません。\n' + errorFileNames.join('\n') + '\nアップロードするファイルはCSVファイル' + datMessage[1] + 'を使用して下さい。');
         return false;
     }
