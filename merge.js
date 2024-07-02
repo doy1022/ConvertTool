@@ -1790,7 +1790,8 @@ function generateInquiryFiles() {
                 '課税区分',
                 '転入元都道府県市区町村コード',
                 '異動事由コード',
-                '住民票コード'
+                '住民票コード',
+                '続柄１'
             ];
             const columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
@@ -1835,16 +1836,17 @@ function generateInquiryFiles() {
     reader.readAsText(files[0]);
 
     /**
-     * 課税区分が空でない、もしくは「未申告（=4）でない行 または ②前住所コードが「99999」でない行を抽出し、ファイル形式を整える処理
+     * ①課税区分が「空」「3」「4」「99」でない（「1」か「2」である）②前住所コードが「99999」でない ③続柄１が「02」である行を抽出し、ファイル形式を整える処理
      */
     function generatePublicAccountInquiryFile(columnIndices, header, rows) {
         // 条件に合致するレコードのみをフィルタする
         const filteredLines = rows.filter(line => {
-            const [taxClassification, previousAddressCode] = [
+            const [taxClassification, previousAddressCode, familyRelationship] = [
                 line[columnIndices[2]],
-                line[columnIndices[3]]
+                line[columnIndices[3]],
+                line[columnIndices[6]]
             ];
-            return taxClassification !== '' && taxClassification !== '3' && taxClassification !== '4' && taxClassification !== '99' && previousAddressCode !== '99999';
+            return taxClassification !== '' && taxClassification !== '3' && taxClassification !== '4' && taxClassification !== '99' && previousAddressCode !== '99999' && familyRelationship === '02';
         });
         // generateFixedLengthFileにテキストを渡し、中間サーバに連携する向けにファイル形式を整える
         // 税情報照会用ファイルと仕様は同じだが「事務手続きコード」「情報提供者機関コード」「特定個人情報名コード」が異なるため、引数で値を渡す
