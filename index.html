@@ -15,11 +15,11 @@
     <div class="tools-container">
         <div class="tabbox">
             <input type="radio" name="tabset" id="tabcheck1" class="tabBtn" checked><label for="tabcheck1"
-                class="tab">タブ1</label>
+                class="tab">税情報照会用ファイルを作成する</label>
             <input type="radio" name="tabset" id="tabcheck2" class="tabBtn"><label for="tabcheck2"
-                class="tab">タブ2</label>
+                class="tab">公金口座照会用ファイルを作成する</label>
             <input type="radio" name="tabset" id="tabcheck3" class="tabBtn"><label for="tabcheck3"
-                class="tab">タブ3</label>
+                class="tab">ServiceNowにインポートするファイルを作成する</label>
             <div class="tabcontent" id="tabcontent1">
                 <h1>0.賦課マスタ・個人基本マスタをマージする</h1>
                 <form id="csvForm0">
@@ -105,7 +105,7 @@
                     <input type="file" id="file17" accept=".csv"><br><br>
                     <label for="file18">帰化対象者税情報確認結果ファイルをアップロードしてください:</label>
                     <input type="file" id="file18" accept=".csv"><br><br>
-                    <button type="button" onclick="updateTaxInfoByNaturalizedCitizenFile()">中間ファイル⑥を作成する</button>
+                    <button type="button" onclick="mergePublicFundAccountInfo()">中間ファイル⑥を作成する</button>
                 </form>
 
                 <h1>8.下記の2ファイルを作成する</h1>
@@ -120,12 +120,25 @@
                 </form>
             </div>
             <div class="tabcontent" id="tabcontent3">
-                <!--ここから作成前。とりあえず置いてみただけ。あとはfunctionを書けば終わり（Javascript側を一切書いてない）-->
-                <h1>SN.「均等割りのみ課税」「非課税」対象者ファイルを整形し、SNにインポートする給付対象者リストを作成する</h1>
+                <h1>9.中間ファイル⑥と公金口座照会結果ファイルをマージする</h1>
+                <form id="csvForm16">
+                    <label for="file22">中間ファイル⑥をアップロードしてください:</label>
+                    <input type="file" id="file22" accept=".csv"><br><br>
+                    <label for="file23">番号連携照会結果（公金受取口座情報）ファイルをアップロードしてください:</label>
+                    <input type="file" id="file23" accept=".DAT"><br><br>
+                    <button type="button" onclick="mergePublicFundAccountInfo()">中間ファイル⑦を作成する</button>
+                </form>
+
+                <h1>10.下記の3ファイルを作成する</h1>
+                <ul>
+                    <li>ServiceNowにインポートする「プッシュ通知対象者ファイル」</li>
+                    <li>ServiceNowにインポートする「公金受取口座ファイル」</li>
+                    <li>中間ファイル⑧</li>
+                </ul>
                 <form id="csvForm17">
-                    <label for="file23">中間ファイル⑪をアップロードしてください:</label>
-                    <input type="file" id="file23" accept=".csv"><br><br>
-                    <button type="button" onclick="">SNインポート向け対象者リストを作成する</button>
+                    <label for="file24">中間ファイル⑦をアップロードしてください:</label>
+                    <input type="file" id="file24" accept=".csv"><br><br>
+                    <button type="button" onclick="generateFilesforPushTargetImport()">上記3ファイルを作成する</button>
                 </form>
             </div>
         </div>
