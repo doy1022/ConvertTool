@@ -7,9 +7,13 @@ const MIDDLE_FILE_3 = "中間ファイル③.csv";
 const MIDDLE_FILE_4 = "中間ファイル④.csv";
 const MIDDLE_FILE_5 = "中間ファイル⑤.csv";
 const MIDDLE_FILE_6 = "中間ファイル⑥.csv";
+const MIDDLE_FILE_7 = "中間ファイル⑦.csv";
+const MIDDLE_FILE_8 = "中間ファイル⑧.csv";
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const RESIDENTINFO_INQUIRY_FILE_2 = "住基照会用ファイル②.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
+const PUSH_TARGET_FILE = '新たな給付_プッシュ対象者ファイル.csv';
+const PUBLIC_ACCOUNT_FILE = '新たな給付_公金受取口座ファイル.csv';
 const NUMBER_OF_DATA_DIVISION = 10000; // 税情報データ分割数
 
 // todo カラム不備のエラハン
@@ -151,7 +155,6 @@ function mergeTaxCSV() {
     }
 }
 
-// todo カラム不備のエラハン
 /* 1.住基情報・税情報・住民票コード・前住所地の住所コードをマージする大元の処理 */
 function mergeCSV() {
     // 各ファイルのIDを配列に格納する
@@ -1877,6 +1880,529 @@ function generateInquiryFiles() {
         return [['宛名番号', '住民票コード'].join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
     }
 }
+
+/* 9.中間ファイル⑥と公金口座照会結果ファイルをマージする処理 */
+function mergePublicFundAccountInfo() {
+    const fileIds = ['file22', 'file23'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files, true);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」もしくは「.DAT」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル⑥」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル⑥')) {
+        alert('アップロードするファイル名を「中間ファイル⑥」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル⑥」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 9 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    const mergedPublicFundAccountInfoText = mergePublicFundAccountInfoByNonHeaderFile(results[0], results[1]);
+                    downloadCSV(mergedPublicFundAccountInfoText, MIDDLE_FILE_7);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 9 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+
+    function mergePublicFundAccountInfoByNonHeaderFile(csvText1, csvText2) {
+        // 公金口座情報ファイルがヘッダー無しファイルのため、ファイル一行目に追加する用のヘッダーを定義する
+        let column = new Array(52);
+
+        // カラムが最初空文字列で初期化されているため、1から始まるようにする
+        for (let i = 0; i < column.length; i++) {
+            column[i] = i + 1;
+        }
+
+        // 後続処理で使用するカラム名は連番とは別で定義する
+        column[1] = '宛名番号';
+        column[26] = '照会処理結果メッセージ（特定個人情報名単位）';
+        column[34] = '金融機関コード';
+        column[38] = '店番';
+        column[42] = '預貯金種目コード';
+        column[44] = '口座番号';
+        column[46] = '名義人氏名';
+
+        // ヘッダー配列を「,」で区切り、税情報照会ファイルの先頭に追加する
+        csvText2 = column.join(',') + '\r\n' + csvText2;
+
+        // CSVテキストを行ごとに分割して配列に変換
+        const arrayFromMidFile = parseCSV(csvText1);
+        const arrayFromInquiryResult = parseCSV(csvText2);
+
+        // 各ファイルのヘッダー行を取得
+        const midFileHeader = arrayFromMidFile.header;
+        const inquiryResultHeader = arrayFromInquiryResult.header;
+        // 宛名番号indexを指定する
+        const addressNumIndex1 = midFileHeader.indexOf('宛名番号');
+        const addressNumIndex2 = inquiryResultHeader.indexOf('宛名番号');
+        // 後続処理に使用するカラムのindexを指定する
+        const inquiryResultMessageIndex = inquiryResultHeader.indexOf('照会処理結果メッセージ（特定個人情報名単位）');
+        // 中間ファイル⑥のヘッダーに、公金口座照会結果ファイルの必要項目ヘッダーを追加する
+        const fullHeader = Array.from(new Set([...midFileHeader, inquiryResultHeader[34], inquiryResultHeader[38], inquiryResultHeader[42], inquiryResultHeader[44], inquiryResultHeader[46]]));
+        // 出力用のCSVデータを定義する
+        const output = [fullHeader.join(',')];
+
+        // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
+        const missingColumns = [];
+        if (addressNumIndex1 === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：宛名番号');
+        }
+
+        if (missingColumns.length > 0) {
+            throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
+        }
+
+        // 中間ファイル⑥を基準にマッピングし、マージ処理を行う
+        const map = new Map();
+        arrayFromMidFile.rows.forEach(row => {
+            const addressNumber = row[addressNumIndex1];
+            // headersとrowからオブジェクトを生成する
+            const rowObj = arrayFromMidFile.header.reduce((obj, header, i) => {
+                obj[header] = row[i];
+                return obj;
+            }, {});
+            map.set(addressNumber, rowObj);
+        });
+
+        // 中間ファイルに存在しない宛名番号を格納する変数
+        let nonExistingAddresseeNumber = [];
+        let nonExistingAddresseeNumberMap = new Map();
+
+        // 宛名番号をキーにしてマージ処理を行う
+        arrayFromInquiryResult.rows.forEach(row => {
+            // 公金受取口座照会結果ファイルの宛名番号は左側0埋め15桁表記のため、下10桁になるように加工してからマッピング処理を行う
+            const addressNumber = row[addressNumIndex2].slice(-10);
+            if (map.has(addressNumber)) {
+                const rowObj = inquiryResultHeader.reduce((obj, header, i) => {
+                    // 宛名番号もマッピングすると15桁の宛名番号で上書きされてしまうため、rowObjには公金受取口座照会結果ファイルの宛名番号を含めない（＝宛名番号はマージしない）
+                    if (header !== '宛名番号') {
+                        obj[header] = row[i];
+                    }
+                    return obj;
+                }, {});
+                // 照会が正常終了している（口座情報が取得できている）場合、マージ処理を行う
+                if (row[inquiryResultMessageIndex] === '正常終了') {
+                    map.set(addressNumber, { ...map.get(addressNumber), ...rowObj });
+                }
+                // 照会が正常終了していない（口座情報が取得できていない）場合、マージ処理は行わず、代わりに「課税区分」を「4（=未申告）」に更新する
+                else {
+                    map.get(addressNumber)['課税区分'] = '4';
+                }
+            }
+            // 中間ファイル⑥にない宛名番号がある場合、警告表示用リストに追加する
+            else {
+                nonExistingAddresseeNumberMap.set(addressNumber, addressNumber);
+            }
+        });
+
+        nonExistingAddresseeNumberMap.forEach(function (value, key) {
+            nonExistingAddresseeNumber.push(value);
+        });
+
+        // 中間ファイル⑥に存在しない宛名番号がある場合、警告表示・ファイルを出力する
+        if (nonExistingAddresseeNumber.length > 0) {
+            logger.warn("公金受取口座照会結果ファイルに存在し、中間ファイル⑥に存在しない宛名番号が検出されました。\n件数：" + nonExistingAddresseeNumber.length);
+            downloadCSV(nonExistingAddresseeNumber.join('\r\n'), "公金受取口座照会結果ファイルに存在し、中間ファイル⑥に存在しない宛名番号.csv");
+        }
+
+        // マージしたデータをCSV形式に戻し、出力する
+        map.forEach(value => {
+            const row = fullHeader.map(header => value[header] || '');
+            output.push(row.join(','));
+        });
+        return output.join('\r\n') + '\r\n';
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 10.ServiceNowにインポートする「プッシュ通知対象者ファイル」「公金受取口座ファイル」、プッシュ対象者を除外した「中間ファイル⑧」を作成する処理 */
+function generateFilesforPushTargetImport() {
+    // 各ファイルのIDを配列に格納する
+    const fileIds = ['file24'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // ファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル⑦」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル⑦')) {
+        alert('アップロードするファイル名を「中間ファイル⑦」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル⑦」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 10 処理を開始しました');
+    //showLoading();
+
+    // 読み込んだデータをresults配列の対応する位置に保存する
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            // 全ての処理が完了したら、結果をダウンロードする
+            let targetTextFlg = false;
+            let publicAccountTextFlg = false;
+            let midFileTextFlg = false;
+
+            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+            let text = e.target.result;
+
+            // 必要なヘッダーがあるかチェック
+            const { header, rows } = parseCSV(text);
+            var requiredColumns = [
+                '宛名番号',
+                '世帯番号',
+                '課税区分',
+                '転入元都道府県市区町村コード',
+                '異動事由コード',
+            ];
+            var columnIndices = requiredColumns.map(col => header.indexOf(col));
+            // 足りないカラムをチェック
+            var missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+            if (missingColumns.length > 0) {
+                throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+            }
+
+            // プッシュ通知対象者ファイルの作成処理
+            const pushTargetText = generatePushTargetfile(columnIndices, header, rows);
+            if (!pushTargetText) {
+                logger.warn('■ファイル名：' + PUSH_TARGET_FILE + ' >> 出力対象レコードが存在しませんでした。');
+            } else {
+                targetTextFlg = true;
+            }
+
+            // 公金受取口座ファイルの作成処理
+            requiredColumns = [
+            ];
+            // カラムのインデックスを取得
+            columnIndices = requiredColumns.map(col => header.indexOf(col));
+            // 足りないカラムをチェック
+            missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+            if (missingColumns.length > 0) {
+                throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+            }
+
+            const publicAccountText = generatePublicAccountfile(columnIndices, header, rows);
+            if (!publicAccountText) {
+                logger.warn('■ファイル名：' + PUBLIC_ACCOUNT_FILE + ' >> 出力対象レコードが存在しませんでした。');
+            } else {
+                publicAccountTextFlg = true;
+            }
+
+            // 中間ファイル⑧の作成処理
+            const Midfile8Text = generateMidfile8(header, rows);
+            if (!Midfile8Text) {
+                logger.warn('■ファイル名：' + MIDDLE_FILE_8 + ' >> 出力対象レコードが存在しませんでした。');
+            } else {
+                midFileTextFlg = true;
+            }
+
+            // 各ファイルをダウンロード            
+            if (targetTextFlg) {
+                downloadCSV(pushTargetText, PUSH_TARGET_FILE);
+            }
+            if (publicAccountTextFlg) {
+                downloadCSV(publicAccountText, PUBLIC_ACCOUNT_FILE);
+            }
+            if (midFileTextFlg) {
+                downloadCSV(Midfile8Text, MIDDLE_FILE_8);
+            }
+        } catch (error) {
+            // catchしたエラーを表示
+            logger.error(error);
+        } finally {
+            logger.info('STEP 10 処理を終了しました');
+            //hideLoading();
+        }
+    };
+    // onloadイベントを発火
+    reader.readAsText(files[0]);
+
+    //ここから何も手付けてないああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああ
+    /**
+    *  口座情報が存在する住民が所属する世帯の世帯員全員を抽出し、ファイル形式を整える処理
+    */
+    function generatePushTargetfile(columnIndices, header, rows) {
+        // ヘッダーとレコード行に分割
+        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
+
+        // 条件に合致するレコードのみをフィルタする
+        const filteredLines = rows.filter(line => {
+            const [changeReasonCode, previousAddressCode] = [
+                line[columnIndices[2]],
+                line[columnIndices[3]]
+            ];
+            return (!validCodes.includes(changeReasonCode) && previousAddressCode == '99999');
+        });
+
+        // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出する
+        const selectedLines = filteredLines.map(line => [
+            line[columnIndices[0]],  // 宛名番号列
+            line[columnIndices[1]]   // 住民票コード列
+        ]);
+
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+        return [['宛名番号', '住民票コード'].join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+    }
+
+    /**
+    * 転入元都道府県市区町村コードが「99999」ではないかつ異動事由コードがA51,A52,A61,A62,BE1,BE2,BF1,BF2のいずれかの住民を抽出し、ファイル形式を整える
+    */
+    function filterChangeReasonCode(columnIndices, rows) {
+        const validCodes = ['A51', 'A52', 'A61', 'A62', 'BE1', 'BE2', 'BF1', 'BF2'];
+        // 出力用のヘッダーを定義する
+        const outputHeader = [
+            '宛名番号',
+            '世帯番号',
+            'カナ氏名',
+            '漢字氏名',
+            '生年月日',
+            '性別',
+            '異動日',
+            '届出日',
+            '異動事由コード',
+            '住民日',
+            '住民届出日',
+            '住民事由コード',
+            '現住所住定日',
+            '現住所届出日',
+            '消除日',
+            '消除届出日',
+            '消除事由コード',
+        ];
+
+        // 条件に合致する行を抽出する
+        const filteredLines = rows.filter(line => {
+            const [changeReasonCode, previousAddressCode] = [
+                line[columnIndices[8]],
+                line[columnIndices[17]]
+            ];
+            return (validCodes.includes(changeReasonCode) && previousAddressCode !== '99999');
+        });
+
+        // フィルタリングされた行から、必要なカラムのデータのみを抽出する
+        const selectedLines = filteredLines.map(line => [
+            line[columnIndices[0]],
+            line[columnIndices[1]],
+            line[columnIndices[2]],
+            line[columnIndices[3]],
+            line[columnIndices[4]],
+            line[columnIndices[5]],
+            line[columnIndices[6]],
+            line[columnIndices[7]],
+            line[columnIndices[8]],
+            line[columnIndices[9]],
+            line[columnIndices[10]],
+            line[columnIndices[11]],
+            line[columnIndices[12]],
+            line[columnIndices[13]],
+            line[columnIndices[14]],
+            line[columnIndices[15]],
+            line[columnIndices[16]]
+        ]);
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+        return [outputHeader.join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+    }
+}
+
+/**
+ * 中間サーバ照会用のファイルを作成する処理（他ステップでも使用する予定のため、Globalのfunctionとして作成した）
+ * @param {string} text - 整形のインプットとなるテキストデータ。
+ * @param {string} procedureCode - 固定値として使用する「事務手続きコード」。
+ * @param {string} personalInfoCode - 固定値として使用する「特定個人情報名コード」。
+ * @param {boolean} [variableAndFixedSwitch=false] - 「転入元都道府県市区町村コード」カラムを固定値か可変値か切り替える。（デフォルトは可変値）
+ * @returns {string} - 生成された固定長ファイルのテキストデータ。
+ */
+function generateFixedLengthFile(text, procedureCode, personalInfoCode, variableAndFixedSwitch = false) {
+    const lines = parseCSV(text);
+    const headers = lines.header;
+    const toolUseTime = getCurrentTime().replace(/[:.\-\s]/g, '').trim();
+
+    // アウトプット用のカラムを個別に定義する。プロパティでカラム長、該当する項目、埋め値、固定値（あれば）を定義
+    const column1 = { length: 2, name: '番号体系', padding: '0', value: '01' };
+    const column2 = { length: 15, name: '宛名番号', padding: '0' };
+    const column3 = { length: 15, name: '統合宛名番号', padding: '' };
+    const column4 = { length: 17, name: '照会依頼日時', value: toolUseTime };
+    const column5 = { length: 20, name: '情報照会者部署コード', padding: ' ', padDirection: 'right', value: '3595115400' };
+    const column6 = { length: 20, name: '情報照会者ユーザーID', padding: '' };
+    const column7 = { length: 16, name: '情報照会者機関コード', padding: '0', value: '0220113112101700' };
+    const column8 = { length: 1, name: '照会側不開示コード', padding: '0', value: '1' };
+    const column9 = { length: 16, name: '事務コード', padding: '0', value: 'JM01000000121000' };
+    const column10 = { length: 16, name: '事務手続きコード', padding: '0', value: procedureCode };
+    const column11 = { length: 16, name: '情報照会者機関コード（委任元）', padding: '' };
+    const column12 = { length: 16, name: '情報提供者機関コード（委任元）', padding: '' };
+    // semiColumn13は再代入可能な変数として定義し、デフォルト引数「variableAndFixedSwitch」で値を切り替える（基本は可変値として定義する）
+    let semiColumn13 = { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right' };
+
+    // 公金口座照会用ファイル作成の場合「1419900000002200（固定値）」を再代入する
+    if (variableAndFixedSwitch) {
+        semiColumn13 = { length: 16, name: '転入元都道府県市区町村コード', padding: ' ', padDirection: 'right', value: '1419900000002200' };
+    }
+
+    const column13 = semiColumn13;
+    const column14 = { length: 16, name: '特定個人情報名コード', padding: '0', value: personalInfoCode };
+    const column15 = { length: 1, name: '照会条件区分', padding: '0', value: '0' };
+    const column16 = { length: 1, name: '照会年度区分', padding: '0', value: '0' };
+    const column17 = { length: 8, name: '照会開始日付', padding: '' };
+    const column18 = { length: 8, name: '照会終了日付', padding: '' };
+
+    // 全カラムを配列にまとめる
+    const columnDefinitions = [column1, column2, column3, column4, column5, column6, column7, column8, column9,
+        column10, column11, column12, column13, column14, column15, column16, column17, column18];
+
+    return lines.rows.map(line => {
+        return columnDefinitions.map(colDef => {
+            // 転入元都道府県市区町村コードの場合、政令指定都市対応を行う
+            if (colDef.name === '転入元都道府県市区町村コード') {
+                line[headers.indexOf(colDef.name)] = convertCityCode(line[headers.indexOf(colDef.name)]);
+            }
+            const value = colDef.value || line[headers.indexOf(colDef.name)] || '';
+            if (colDef.padDirection === 'left') {
+                // 左側をパディング
+                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+            } else if (colDef.padDirection === 'right') {
+                // 右側をパディング
+                return value.padEnd(colDef.length, colDef.padding).substring(0, colDef.length);
+            } else {
+                // デフォルトは左側をパディング
+                return value.padStart(colDef.length, colDef.padding).substring(0, colDef.length);
+            }
+        }).join(',');
+    }).join('\r\n');
+    // downloadCSVにて最終行の改行を付与するため、ここでは最終行の改行（ + '\r\n'）を付与しない
+}
+
+function outputOnlyErrorRecordDatFile() {
+    const fileIds = ['file10', 'errorFile1'];
+    const noTaxinfoFile = "[only error rows]P640R110_" + getCurrentTime().replace(/[:.\-\s]/g, '').trim().slice(0, 14); // 税情報照会用ファイル（YYYYMMDDHHmmssの14桁）
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル②」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル④')) {
+        alert('アップロードするファイル名を「中間ファイル④」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル②」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 5(ERROR対応) 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    const middle_file_4_str = results[0];
+                    const errorAddress = parseCSV(results[1]);
+                    // 右から10桁のみを取得
+                    const errorAddressNums = errorAddress.rows.map(line => line[0].slice(-10));
+                    // 必要なヘッダーがあるかチェック
+                    const { header, rows } = parseCSV(middle_file_4_str);
+                    var requiredColumns = [
+                        '宛名番号',
+                        '世帯番号',
+                        '課税区分',
+                        '転入元都道府県市区町村コード',
+                        '異動事由コード',
+                        // '情報提供者機関コード' // 20240617_機関コードへの変換処理が不要となったためコメントアウト
+                    ];
+                    var columnIndices = requiredColumns.map(col => header.indexOf(col));
+                    // 足りないカラムをチェック
+                    var missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+                    if (missingColumns.length > 0) {
+                        throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+                    }
+
+                    // ①課税区分に値がある行除外 ②前住所コードの値による行除外 ③異動事由コードの値による行除外（一つのfunctionにまとめています）
+                    const filteredText = FilterTaxAndAddressAndMovementReason(columnIndices, header, rows, errorAddressNums);
+                    if (!filteredText) {
+                        logger.warn('■ファイル名：' + noTaxinfoFile + ' >> 出力対象レコードが存在しませんでした。');
+                    } else {
+                        downloadCSV(filteredText, noTaxinfoFile, true);
+                    }
+
+                    //const mergedCSV = deleteRows(results[0], results[1], ['宛名番号', '世帯番号']);
+
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 5(ERROR対応) 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+}
+
+
+
+
+
+
+
+
+
+
 
 /* 以下、使いまわすメソッド（汎用処理）ここから */
 
