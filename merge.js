@@ -12,7 +12,8 @@ const MIDDLE_FILE_8 = "中間ファイル⑧.csv";
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const RESIDENTINFO_INQUIRY_FILE_2 = "住基照会用ファイル②.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
-const PUSH_TARGET_FILE = '新たな給付_プッシュ対象者.csv';
+const BENEFICIARY_FILE = '新たな給付_給付対象者.csv';
+const PUSH_TARGET_FLG_FILE = '新たな給付_直接振込対象者.csv';
 const PUBLIC_ACCOUNT_FILE = '新たな給付_公金受取口座情報.csv';
 const NUMBER_OF_DATA_DIVISION = 10000; // 税情報データ分割数
 
@@ -2039,7 +2040,7 @@ function mergePublicFundAccountInfo() {
     }
 }
 
-/* 10.ServiceNowにインポートする「プッシュ通知対象者ファイル」「公金受取口座ファイル」、プッシュ対象者を除外した「中間ファイル⑧」を作成する処理 */
+/* 10.ServiceNowにインポートする「給付対象者ファイル」「直接振込対象者ファイル」「公金受取口座ファイル」、直接振込対象者を除外した「中間ファイル⑧」を作成する処理 */
 function generateFilesforPushTargetImport() {
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file24'];
@@ -2068,8 +2069,9 @@ function generateFilesforPushTargetImport() {
     const reader = new FileReader();
     reader.onload = function (e) {
         try {
-            // 全ての処理が完了したら、結果をダウンロードする
-            let targetTextFlg = false;
+            // 全ての処理が完了したら結果をダウンロードするためのフラグ
+            let beneficiaryTextFlg = false;
+            let pushTargetTextFlg = false;
             let publicAccountTextFlg = false;
             let midFileTextFlg = false;
 
@@ -2079,9 +2081,9 @@ function generateFilesforPushTargetImport() {
             // 中間ファイル⑥の内容を読み込む
             const { header, rows } = parseCSV(text);
 
-            /* プッシュ通知対象者ファイルの作成処理 */
-            // プッシュ通知対象者ファイルの作成に必要なカラムを代入する
-            var requiredColumns = [
+            /* 給付対象者ファイルの作成処理 */
+            // 給付対象者ファイルの作成に必要なカラムを定義する（後続の3ファイル作成処理でもそのまま使用可能）
+            const requiredColumns = [
                 '宛名番号',
                 '漢字氏名',
                 'カナ氏名',
@@ -2093,6 +2095,9 @@ function generateFilesforPushTargetImport() {
                 '現住所方書',
                 '世帯番号',
                 '続柄１',
+                '続柄２',
+                '続柄３',
+                '続柄４',
                 '外国人通称名',
                 '外国人カナ通称名',
                 '英字氏名',
@@ -2102,40 +2107,30 @@ function generateFilesforPushTargetImport() {
                 '金融機関コード',
                 '預貯金種目コード'
             ];
-            var columnIndices = requiredColumns.map(col => header.indexOf(col));
+            const columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
-            var missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+            const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
 
             if (missingColumns.length > 0) {
                 throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
             }
 
+            const beneficiaryText = generateBeneficiaryfile(columnIndices, rows);
+            if (!beneficiaryText) {
+                logger.warn('■ファイル名：' + BENEFICIARY_FILE + ' >> 出力対象レコードが存在しませんでした。');
+            } else {
+                beneficiaryTextFlg = true;
+            }
+
+            /* 直接振込対象者ファイルの作成処理 */
             const pushTargetText = generatePushTargetfile(columnIndices, rows);
             if (!pushTargetText) {
-                logger.warn('■ファイル名：' + PUSH_TARGET_FILE + ' >> 出力対象レコードが存在しませんでした。');
+                logger.warn('■ファイル名：' + PUSH_TARGET_FLG_FILE + ' >> 出力対象レコードが存在しませんでした。');
             } else {
-                targetTextFlg = true;
+                pushTargetTextFlg = true;
             }
 
             /* 公金受取口座ファイルの作成処理 */
-            // 公金受取口座ファイルの作成に必要なカラムを再代入する
-            requiredColumns = [
-                '宛名番号',
-                '名義人氏名',
-                '口座番号',
-                '店番',
-                '金融機関コード',
-                '預貯金種目コード'
-            ];
-            // カラムのインデックスを取得
-            columnIndices = requiredColumns.map(col => header.indexOf(col));
-            // 足りないカラムをチェック
-            missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
-
-            if (missingColumns.length > 0) {
-                throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
-            }
-
             const publicAccountText = generatePublicAccountfile(columnIndices, rows);
             if (!publicAccountText) {
                 logger.warn('■ファイル名：' + PUBLIC_ACCOUNT_FILE + ' >> 出力対象レコードが存在しませんでした。');
@@ -2152,8 +2147,11 @@ function generateFilesforPushTargetImport() {
             }
 
             // 各ファイルをダウンロード            
-            if (targetTextFlg) {
-                downloadCSV(pushTargetText, PUSH_TARGET_FILE);
+            if (beneficiaryTextFlg) {
+                downloadCSV(beneficiaryText, BENEFICIARY_FILE);
+            }
+            if (pushTargetTextFlg) {
+                downloadCSV(pushTargetText, PUSH_TARGET_FLG_FILE);
             }
             if (publicAccountTextFlg) {
                 downloadCSV(publicAccountText, PUBLIC_ACCOUNT_FILE);
@@ -2175,7 +2173,7 @@ function generateFilesforPushTargetImport() {
     /**
     *  口座情報が存在する住民が所属する世帯の世帯員全員を抽出し、ファイル形式を整える処理
     */
-    function generatePushTargetfile(columnIndices, rows) {
+    function generateBeneficiaryfile(columnIndices, rows) {
         // 出力用のヘッダーを定義する
         const outputHeader = [
             '宛名番号',
@@ -2225,22 +2223,56 @@ function generateFilesforPushTargetImport() {
         // 出力用の行を格納するリストを定義する
         const outputLines = [];
 
-        // 公金口座番号カラムが空でない（プッシュ対象世帯の世帯主）行を抽出する
-        const filteredLines = rows.filter(line => line[columnIndices[14]]);
+        // 性別カラムの変換時、中間ファイル⑦内の性別コードが「1」「2」の場合にエラーを出力するため、エラー出力用のリストを定義する
+        const genderErrorAddressNums = [];
 
-        // 公金口座番号カラムが空でない（プッシュ対象世帯の世帯主）行毎に、宛名番号・世帯番号を取得後、出力用リストに追加する処理を行う
+        // 続柄カラムの変換時、中間ファイル⑦内の続柄１が空の場合にエラーを出力するため、エラー出力用のリストを定義する
+        const relationshipErrorAddressNums = [];
+
+        // 口座名義カラム・口座番号カラムが空でない（直接振込対象世帯の世帯主）行を抽出する
+        const filteredLines = rows.filter(line => line[columnIndices[17]] && line[columnIndices[18]]);
+
+        // 口座名義カラム・口座番号カラムが空でない（直接振込対象世帯の世帯主）行毎に、宛名番号・世帯番号を取得後、出力用リストに追加する処理を行う
         filteredLines.forEach(line => {
-            const addressNum = line[columnIndices[0]];
-            const householdNum = line[columnIndices[9]];
+            const addressNum = line[columnIndices[0]]; // 宛名番号を取得する
+            const householdNum = line[columnIndices[9]]; // 世帯番号を取得する
 
             // 世帯主行を出力用リストに追加する。その際、「受給者宛名番号」は空に設定する
-            outputLines.push([
-                line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号
-                '', // 受給者宛名番号（世帯主行は空にする）
+            outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, ''));
+
+            // 世帯番号をキーにして、世帯主以外の世帯員レコードを取得する
+            const householdMemberLines = rows.filter(otherLine => otherLine[columnIndices[9]] === householdNum && otherLine !== line);
+
+            // 世帯員の行を出力用リストに追加する。その際、「受給者宛名番号」に世帯主の宛名番号を設定する
+            householdMemberLines.forEach(line => {
+                outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, addressNum));
+            });
+        });
+
+        /**
+         * 抽出後の行のうち必要なカラムのみを抽出し、出力用の行を作成する処理
+         * @param {Array} line - 出力用の行を作成する元となる行
+         * @param {Array} columnIndices - 出力用の行を作成する元となる行のカラムインデックス
+         * @param {String} addressNum - 出力用の行に設定する「受給者宛名番号」（世帯主の場合は空（''）、他世帯員の場合は世帯主の宛名番号を引数として設定する）
+         * @returns {Array} 必要なカラムのみを抽出し、出力用の行を作成した結果
+        */
+        function createOutputLineForBeneficiaryFile(line, columnIndices, addressNum) {
+            let semiProcessedAddressNum = addressNum;
+            // 引数「addressNum」が空でない場合、15桁の宛名番号に変換する
+            if (addressNum !== '') {
+                semiProcessedAddressNum = addressNum.toString().padStart(15, '0');
+            }
+            // 定数として定義しなおす
+            const processedAddressNum = semiProcessedAddressNum
+
+            return [
+                // 以下、テンプレートのカラム  
+                line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号（15桁に変換する）
+                processedAddressNum, // 受給者宛名番号（世帯主の場合は空、他世帯員の場合は世帯主の宛名番号を15桁に変換した番号を設定する）
                 line[columnIndices[1] || columnIndices[13]], // 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
                 line[columnIndices[2]], // カナ氏名
-                parseDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
-                convertGenderCode(line[columnIndices[4]]), // 性別（住基情報内のコードを文字列に変換する）
+                separateDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
+                convertGenderCode(line[columnIndices[4]] ,line[columnIndices[0]] ,genderErrorAddressNums), // 性別（住基情報内のコードを文字列に変換する）
                 excludeHyphen(line[columnIndices[5]]), // 電話番号（ハイフンを除去する）
                 excludeHyphen(line[columnIndices[6]]), // 郵便番号（ハイフンを除去する）
                 line[columnIndices[7]], // 住所
@@ -2250,10 +2282,10 @@ function generateFilesforPushTargetImport() {
                 '', // 異動元方書
                 line[columnIndices[9]].toString().padStart(15, '0'), // 世帯番号
                 '', // 世帯主宛名番号（世帯主行は空にする）
-                line[columnIndices[10]], // 続柄
+                convertRelationshipCode(line[columnIndices[10]], line[columnIndices[11]], line[columnIndices[12]], line[columnIndices[13]], line[columnIndices[0]] , relationshipErrorAddressNums), // 続柄（続柄コードを文字列に変換する）
                 '1', // 郵送対象者フラグ（郵送対象者のため「1」を設定）
-                line[columnIndices[11]], // 外国人通称名
-                line[columnIndices[12]], // 外国人カナ通称名
+                line[columnIndices[14]], // 外国人通称名
+                line[columnIndices[15]], // 外国人カナ通称名
                 '非課税均等割確認書', // フォーマット種別（固定値）
                 'R6S1SBS', // 課税区分（固定値）
                 '', // 住民カスタム属性（空）
@@ -2278,63 +2310,63 @@ function generateFilesforPushTargetImport() {
                 '', // 専従主_県減免後均等割額
                 '', // 生活扶助認定年月日
                 '' // 生活扶助廃止年月日
-            ]);
+            ];
+        }
 
-            // 世帯番号をキーにして、世帯主以外の世帯員レコードを取得する
-            const householdMemberLines = rows.filter(otherLine => otherLine[columnIndices[9]] === householdNum && otherLine !== line);
+        // 性別コードによるエラーがあれば例外を投げる
+        if (genderErrorAddressNums.length > 0) {
+            throw new Error('以下の住民の性別カラムに「1」「2」以外の値が入力されています。ファイルの確認をお願いします。\n' + genderErrorAddressNums.join('\n'))
+        }
 
-            // 世帯員の行を出力用リストに追加する。その際、「受給者宛名番号」に世帯主の宛名番号を設定する
-            householdMemberLines.forEach(line => {
-                outputLines.push([
-                    // 以下、テンプレートのカラム  
-                    line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号
-                    addressNum.toString().padStart(15, '0'), // 受給者宛名番号（世帯主以外の世帯員行は世帯主の宛名番号を入力する）
-                    line[columnIndices[1] || columnIndices[13]], // 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
-                    line[columnIndices[2]], // カナ氏名
-                    parseDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
-                    convertGenderCode(line[columnIndices[4]]), // 性別（住基情報内のコードを文字列に変換する）
-                    excludeHyphen(line[columnIndices[5]]), // 電話番号（ハイフンを除去する）
-                    excludeHyphen(line[columnIndices[6]]), // 郵便番号（ハイフンを除去する）
-                    line[columnIndices[7]], // 住所
-                    line[columnIndices[8]], // 方書
-                    '', // 異動元郵便番号
-                    '', // 異動元住所
-                    '', // 異動元方書
-                    line[columnIndices[9]].toString().padStart(15, '0'), // 世帯番号
-                    '', // 世帯主宛名番号（世帯主行は空にする）
-                    line[columnIndices[10]], // 続柄
-                    '1', // 郵送対象者フラグ（郵送対象者のため「1」を設定）
-                    line[columnIndices[11]], // 外国人通称名
-                    line[columnIndices[12]], // 外国人カナ通称名
-                    '非課税均等割確認書', // フォーマット種別（固定値）
-                    'R6S1SBS', // 課税区分（固定値）
-                    '', // 住民カスタム属性（空）
-                    // 以下、非課税・均等割特有のカラム
-                    '', // 転入日
-                    '', // 賦課期日居住者フラグ
-                    '', // 照会対象フラグ
-                    '', // 賦課無フラグ
-                    '', // 課税保留フラグ
-                    '', // 租税条約免除フラグ
-                    '', // 生活扶助非課税フラグ
-                    '', // 対象者_課税フラグ
-                    '', // 対象者_市減免後均等割額
-                    '', // 対象者_県減免後均等割額
-                    '', // 扶養主_宛名番号
-                    '', // 扶養主_課税フラグ
-                    '', // 扶養主_市免除後均等割額
-                    '', // 扶養主_県免除後均等割額
-                    '', // 専従主_宛名番号
-                    '', // 専従主_課税フラグ
-                    '', // 専従主_市減免後均等割額
-                    '', // 専従主_県減免後均等割額
-                    '', // 生活扶助認定年月日
-                    '' // 生活扶助廃止年月日
-                ]);
-            });
-        });
+        // 続柄コードによるエラーがあれば例外を投げる
+        if (relationshipErrorAddressNums.length > 0) {
+            throw new Error('以下の住民の続柄１カラムが空です。ファイルの確認をお願いします。\n' + relationshipErrorAddressNums.join('\n'))
+        }
 
         // 出力用リストをカンマで結合し、改行で区切られた文字列に変換
+        return [outputHeader.join(','), ...outputLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+    }
+
+    /**
+    * 直接振込対象者ファイル（フラグ用ファイル）を作成する処理。対象世帯の世帯主、および世帯員全員「直接振込対象者フラグ」カラムに「1（＝直接振込対象者として設定する）」を設定する
+    */
+    function generatePushTargetfile(columnIndices, rows) {
+        // 出力用のヘッダーを定義する
+        const outputHeader = [
+            '宛名番号',
+            '直接振込対象者フラグ',
+            '課税区分キー',
+        ];
+
+        // 出力用の行を格納するリストを定義する
+        const outputLines = [];
+
+        // 抽出対象の世帯番号の値を収集するためのセットを作成する
+        const beneficiaryHouseholdNumSet = new Set();
+
+        // 名義人カラム・公金口座番号カラムが空でない（プッシュ対象世帯の世帯主）行の「世帯番号」を収集する
+        rows.forEach((line) => {
+            if (line[columnIndices[17]] && line[columnIndices[18]]) {
+                // 「世帯番号」の値をセットに追加する
+                beneficiaryHouseholdNumSet.add(line[columnIndices[9]]);
+            }
+        });
+
+        // 収集した世帯番号に属する行（対象世帯員全員）を抽出する
+        const filteredLines = rows.filter((line) => {
+            return beneficiaryHouseholdNumSet.has(line[columnIndices[9]]);
+        });
+
+        // 抽出した行のうち必要なカラムのみ出力用リストに追加する
+        filteredLines.forEach(line => {
+            outputLines.push([
+                line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号
+                '1', // 直接振込対象者フラグ（固定値「1」）
+                'R6S1' // 課税区分キー（固定値「R6S1」）
+            ]);
+        });
+
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
         return [outputHeader.join(','), ...outputLines.map(line => line.join(','))].join('\r\n') + '\r\n';
     }
 
@@ -2356,39 +2388,46 @@ function generateFilesforPushTargetImport() {
         // 口座情報が存在する行を抽出する
         const filteredLines = rows.filter(line => {
             const [accountName, accountNum] = [
-                line[columnIndices[1]],
-                line[columnIndices[2]]
+                line[columnIndices[17]],
+                line[columnIndices[18]]
             ];
-            // 口座名義と口座番号が存在する場合、抽出対象とする（プッシュ対象者かつ口座情報が取得できている）
+            // 口座名義と口座番号が存在する場合、抽出対象とする（プッシュ対象者かつ口座情報が取得できている判定）
             return accountName && accountNum;
         });
 
         // フィルタリングされた行から、必要なカラムのデータのみを抽出する
         const selectedLines = filteredLines.map(line => [
-            line[columnIndices[0]],
-            line[columnIndices[1]],
-            line[columnIndices[2]],
-            line[columnIndices[3]],
-            line[columnIndices[4]],
-            line[columnIndices[5]],
+            line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号は左側0埋め15桁に変換する
+            line[columnIndices[17]],
+            line[columnIndices[18]],
+            line[columnIndices[19]],
+            line[columnIndices[20]],
+            line[columnIndices[21]],
             'R6S1SBS' // 「取込元種別」カラムには固定値「R6S1SBS」を設定する
         ]);
+
         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
         return [outputHeader.join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
     }
 
     /**
-    * 中間ファイル⑧を作成する処理
+    * 公金口座情報がある住民とその世帯員（プッシュ対象者）を除外し、中間ファイル⑧を作成する処理
     */
     function generateMidfile8(columnIndices, header, rows) {
-        // 口座情報が存在しない行を抽出する
-        const filteredLines = rows.filter(line => {
-            const [accountName, accountNum] = [
-                line[columnIndices[1]],
-                line[columnIndices[2]]
-            ];
-            // 口座名義と口座番号が存在しない場合、抽出対象とする（＝プッシュ対象者の住民を除外する）
-            return !(accountName && accountNum);
+        // 除外対象の世帯番号の値を収集するためのセットを作成する
+        const excludedHouseholdNumSet = new Set();
+
+        // 口座名義カラム・口座番号カラムが空でない行の「世帯番号」を収集する
+        rows.forEach((line) => {
+            if (line[columnIndices[17]] && line[columnIndices[18]]) {
+                // 「世帯番号」の値をセットに追加する
+                excludedHouseholdNumSet.add(line[columnIndices[9]]);
+            }
+        });
+
+        // 収集した世帯番号に属する行を除外する
+        const filteredLines = rows.filter((line) => {
+            return !excludedHouseholdNumSet.has(line[columnIndices[9]]);
         });
 
         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
@@ -2518,36 +2557,47 @@ function FilterTaxAndAddressAndMovementReason(columnIndices, header, rows, error
 /**
  * yyyymmdd形式の日付をDateオブジェクトに変換する
  * @param {string} yyyymmdd yyyymmdd形式の日付
- * @param {string} separator 日付の区切り文字（デフォルトはfalse）
  * @return {Date} 日付文字列を解析して生成されたDateオブジェクト
  */
-function parseDate(yyyymmdd, separator = false) {
+function parseDate(yyyymmdd) {
     const year = yyyymmdd.substring(0, 4);
-    // Date型への変換時には月は0から始まるため、1を引く必要があるが、単純な文字列として返す場合はそのまま返す
-    let semiMonth;
-    if (separator) {
-        semiMonth = yyyymmdd.substring(4, 6);
-    } else {
-        semiMonth = yyyymmdd.substring(4, 6) - 1;
-    }
-    const month = semiMonth
+    const month = yyyymmdd.substring(4, 6) - 1;
     const day = yyyymmdd.substring(6, 8);
+    return new Date(year, month, day);
+}
 
-    // 第二引数として区切り文字が指定された場合は、「yyyy{区切り文字}mm{区切り文字}dd」形式の文字列として返す
-    if (separator) {
-        return String(year + separator + month + separator + day);
-    } else {
-        return new Date(year, month, day);
-    }
+/**
+ * yyyymmdd形式の日付を、「yyyy{separator}mm{separator}dd」形式に変換する
+ * @param {string} yyyymmdd yyyymmdd形式の日付
+ * @param {string} separator 日付の区切り文字（デフォルトはfalse）
+ * @return {string} 日付文字列を分割して生成された文字列
+ */
+function separateDate(yyyymmdd, separator) {
+    const year = yyyymmdd.substring(0, 4);
+    const month = yyyymmdd.substring(4, 6);
+    const day = yyyymmdd.substring(6, 8);
+    return String(year + separator + month + separator + day);
 }
 
 /**
  * 住基情報内「性別」のコードを「男性」「女性」に変換する
  * @param {string} genderCode 「1」または「2」の性別コード
+ * @param {string} addressNum 宛名番号
+ * @param {array} errorAddressNums エラーの宛名番号を格納・出力するための配列
  * @return {string} 「男性」または「女性」の文字列
  */
-function convertGenderCode(genderCode) {
-    return genderCode === '1' ? '男性' : '女性';
+function convertGenderCode(genderCode, addressNum, errorAddressNums) {
+    if (genderCode === '1') {
+        return '男性';
+    }
+    else if (genderCode === '2') {
+        return '女性';
+    }
+    // 性別が「1」「2」以外である場合、宛名番号をエラー表示用配列に格納する
+    else {
+        errorAddressNums.push(addressNum);
+        return '';
+    }
 }
 
 /**
@@ -2557,6 +2607,73 @@ function convertGenderCode(genderCode) {
  */
 function excludeHyphen(textWithHyphen) {
     return textWithHyphen.replace(/-/g, '');
+}
+
+/**
+ * 住基情報内「続柄」のコードを変換する。「続柄２」以降に値がある（2つ以上属性がある）場合、「の」繋ぎの続柄を作成する
+ * @param {string} relationship1 続柄１のコード
+ * @param {string} relationship2 続柄２のコード
+ * @param {string} relationship3 続柄３のコード
+ * @param {string} relationship4 続柄４のコード
+ * @param {string} addressNum 宛名番号
+ * @param {array} errorAddressNums エラーの宛名番号を格納・出力するための配列
+ * @return {string} 文字列返還後の続柄
+ */
+function convertRelationshipCode(relationship1, relationship2, relationship3, relationship4, addressNum, errorAddressNums) {
+    // 続柄コードと変換後の文字列の対応を定義
+    const RelationshipCodeMap = {
+        '02': '世帯主',
+        '03': '準世帯主',
+        '11': '夫',
+        '12': '妻',
+        '13': '夫(未届)',
+        '14': '妻(未届)',
+        '20': '子',
+        '2X': '子()',
+        '51': '父',
+        '52': '母',
+        '71': '兄',
+        '74': '弟',
+        '81': '姉',
+        '84': '妹',
+        '96': '縁故者',
+        '98': '使用人',
+        '99': '同居人',
+        '53': '養父',
+        '54': '養母',
+        '9Z': 'その他'
+    };
+
+    // 変換された値を格納するための配列
+    const convertedRelationship = [];
+
+    // 続柄１の変換処理
+    if (relationship1 !== '') {
+        convertedRelationship.push(RelationshipCodeMap[relationship1] || relationship1);
+    }
+    // 続柄１が空の場合は宛名番号を配列に格納し、エラー表示をする
+    else {
+        errorAddressNums.push(addressNum);
+        return '';
+    }
+
+    // 続柄２の変換処理
+    if (relationship2 !== '') {
+        convertedRelationship.push(RelationshipCodeMap[relationship2] || relationship2);
+    }
+
+    // 続柄３の変換処理
+    if (relationship3 !== '') {
+        convertedRelationship.push(RelationshipCodeMap[relationship3] || relationship3);
+    }
+
+    // 続柄４の変換処理
+    if (relationship4 !== '') {
+        convertedRelationship.push(RelationshipCodeMap[relationship4] || relationship4);
+    }
+
+    // 変換された値を "の" で結合して返す
+    return convertedRelationship.join('の');
 }
 
 /**
