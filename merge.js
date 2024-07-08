@@ -16,6 +16,7 @@ const BENEFICIARY_FILE = '新たな給付_給付対象者.csv';
 const PUSH_TARGET_FLG_FILE = '新たな給付_直接振込対象者.csv';
 const PUBLIC_ACCOUNT_FILE = '新たな給付_公金受取口座情報.csv';
 const NUMBER_OF_DATA_DIVISION = 10000; // 税情報データ分割数
+const NEWLINE_CHAR_CRLF = '\r\n'; // 改行コード：CRLF
 
 // todo カラム不備のエラハン
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
@@ -2222,16 +2223,13 @@ function generateFilesforPushTargetImport() {
 
         // 出力用の行を格納するリストを定義する
         const outputLines = [];
-
         // 性別カラムの変換時、中間ファイル⑦内の性別コードが「1」「2」の場合にエラーを出力するため、エラー出力用のリストを定義する
         const genderErrorAddressNums = [];
-
         // 続柄カラムの変換時、中間ファイル⑦内の続柄１が空の場合にエラーを出力するため、エラー出力用のリストを定義する
         const relationshipErrorAddressNums = [];
 
         // 口座名義カラム・口座番号カラムが空でない（直接振込対象世帯の世帯主）行を抽出する
         const filteredLines = rows.filter(line => line[columnIndices[17]] && line[columnIndices[18]]);
-
         // 口座名義カラム・口座番号カラムが空でない（直接振込対象世帯の世帯主）行毎に、宛名番号・世帯番号を取得後、出力用リストに追加する処理を行う
         filteredLines.forEach(line => {
             const addressNum = line[columnIndices[0]]; // 宛名番号を取得する
@@ -2324,7 +2322,7 @@ function generateFilesforPushTargetImport() {
         }
 
         // 出力用リストをカンマで結合し、改行で区切られた文字列に変換
-        return [outputHeader.join(','), ...outputLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+        return formatOutputFile(outputHeader, outputLines, NEWLINE_CHAR_CRLF);
     }
 
     /**
@@ -2367,7 +2365,7 @@ function generateFilesforPushTargetImport() {
         });
 
         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return [outputHeader.join(','), ...outputLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+        return formatOutputFile(outputHeader, outputLines, NEWLINE_CHAR_CRLF);
     }
 
     /**
@@ -2407,7 +2405,7 @@ function generateFilesforPushTargetImport() {
         ]);
 
         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return [outputHeader.join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+        return formatOutputFile(outputHeader, selectedLines, NEWLINE_CHAR_CRLF);
     }
 
     /**
@@ -2431,7 +2429,7 @@ function generateFilesforPushTargetImport() {
         });
 
         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return [header.join(','), ...filteredLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+        return formatOutputFile(header, filteredLines, NEWLINE_CHAR_CRLF);
     }
 }
 
@@ -2677,12 +2675,22 @@ function convertRelationshipCode(relationship1, relationship2, relationship3, re
 }
 
 /**
+ * ヘッダー行とヘッダー以外のデータ行を結合し、指定された改行コードを使用してアウトプットファイルの形式に整形する処理
+ * @param {string[]} header ヘッダー行の文字列の配列
+ * @param {string[]} rows ヘッダー以外のデータ行の文字列の配列
+ * @param {string} newlineCode ファイルの改行コード
+ * @return {string} ヘッダー行とデータ行を結合したアウトプットファイルの文字列
+ */
+function formatOutputFile(header, rows, newlineCode) {
+    return [header.join(','), ...rows.map(row => row.join(','))].join(newlineCode) + newlineCode;
+}
+
+/**
  * CSVファイルのダウンロード処理
  * @param {string} content csvファイルのデータを文字列化して入力
  * @param {string} filename 出力するファイルのファイル名
  * @param {boolean} splitRows 出力ファイルを行数で分割するかどうか（デフォルト値はfalse）
  */
-
 function downloadCSV(content, filename, splitRows = false) {
     // 第三引数がtrueの場合、データを分割してダウンロードする
     if (splitRows) {
