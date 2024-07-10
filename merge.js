@@ -1427,25 +1427,8 @@ function updateTaxInfoByInquiryResult() {
     });
 
     function updateTaxInfoByNonHeaderFile(csvText1, csvText2) {
-        // 税情報照会ファイルがヘッダー無しファイルのため、ファイル一行目に追加する用のヘッダーを定義する
-        let column = new Array(262);
-
-        // カラムが最初空文字列で初期化されているため、1から始まるようにする
-        for (let i = 0; i < column.length; i++) {
-            column[i] = i + 1;
-        }
-
-        // 後続処理で使用するカラム名は連番とは別で定義する
-        column[1] = '宛名番号';
-        column[12] = '情報提供者機関コード' // 前住所地コードの有無を判定するために設定
-        column[23] = '照会ステータス（明細単位）'; // 正常終了（税情報が取得できたかどうか）を判別するために設定
-        column[24] = '照会処理結果メッセージ（明細単位）'; // 異常終了の行を特定するために設定
-        column[25] = '照会ステータス（特定個人情報名単位）'; // 正常終了（税情報が取得できたかどうか）を判別するために設定
-        column[230] = '市町村民税均等割額'; // 税区分を判定するために設定
-        column[254] = '市町村民税所得割額（定額減税前）'; // 税区分を判定するために設定
-
-        // ヘッダー配列を「,」で区切り、税情報照会ファイルの先頭に追加する
-        csvText2 = column.join(',') + '\r\n' + csvText2;
+        // 税情報照会ファイルがヘッダー無しファイルのため、ファイル一行目ヘッダーを追加する
+        csvText2 = createHeaderForTaxInfoInquiryFile(csvText2);
 
         // CSVテキストを行ごとに分割して配列に変換
         const arrayFromMidFile = parseCSV(csvText1);
@@ -2265,6 +2248,18 @@ function generateFilesforPushTargetImport() {
             // 定数として定義しなおす
             const processedAddressNum = semiProcessedAddressNum
 
+            // 性別コードを変換し、エラーがあればエラー出力用リストに追加する
+            let genderCode = convertGenderCode(line[columnIndices[4]]);
+            if (genderCode === '') {
+                genderErrorAddressNums.push(line[columnIndices[0]]);
+            }
+
+            // 続柄コードを変換し、エラーがあればエラー出力用リストに追加する
+            let relationshipCode = convertRelationshipCode(line[columnIndices[10]], line[columnIndices[11]], line[columnIndices[12]], line[columnIndices[13]]);
+            if (relationshipCode === '') {
+                relationshipErrorAddressNums.push(line[columnIndices[0]]);
+            }
+
             return [
                 // 以下、テンプレートのカラム  
                 line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号（15桁に変換する）
@@ -2272,7 +2267,7 @@ function generateFilesforPushTargetImport() {
                 line[columnIndices[1] || columnIndices[13]], // 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
                 line[columnIndices[2]], // カナ氏名
                 separateDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
-                convertGenderCode(line[columnIndices[4]], line[columnIndices[0]], genderErrorAddressNums), // 性別（住基情報内のコードを文字列に変換する）
+                genderCode, // 性別
                 excludeHyphen(line[columnIndices[5]]), // 電話番号（ハイフンを除去する）
                 excludeHyphen(line[columnIndices[6]]), // 郵便番号（ハイフンを除去する）
                 line[columnIndices[7]], // 住所
@@ -2282,7 +2277,7 @@ function generateFilesforPushTargetImport() {
                 '', // 異動元方書
                 line[columnIndices[9]].toString().padStart(15, '0'), // 世帯番号
                 '', // 世帯主宛名番号（世帯主行は空にする）
-                convertRelationshipCode(line[columnIndices[10]], line[columnIndices[11]], line[columnIndices[12]], line[columnIndices[13]], line[columnIndices[0]], relationshipErrorAddressNums), // 続柄（続柄コードを文字列に変換する）
+                relationshipCode, // 続柄
                 '1', // 郵送対象者フラグ（郵送対象者のため「1」を設定）
                 line[columnIndices[14]], // 外国人通称名
                 line[columnIndices[15]], // 外国人カナ通称名
@@ -2769,6 +2764,33 @@ function FilterTaxAndAddressAndMovementReason(columnIndices, header, rows, error
 }
 
 /**
+ * 税情報照会結果ファイル（ヘッダー無しファイル）にヘッダーを付与する処理
+ * @param {string} text 税情報照会結果ファイルのデータを文字列化して入力
+ * @return {string} ヘッダーを付与した税情報照会結果ファイルのデータを文字列化して出力
+ */
+function createHeaderForTaxInfoInquiryFile(text) {
+    // ファイル一行目に追加する用のヘッダーを定義する
+    let column = new Array(262);
+
+    // カラムが最初空文字列で初期化されているため、1から始まるようにする
+    for (let i = 0; i < column.length; i++) {
+        column[i] = i + 1;
+    }
+
+    // 後続処理で使用するカラム名は連番とは別で定義する
+    column[1] = '宛名番号';
+    column[12] = '情報提供者機関コード'; // 前住所地コードの有無を判定するために設定
+    column[23] = '照会ステータス（明細単位）'; // 正常終了（税情報が取得できたかどうか）を判別するために設定
+    column[24] = '照会処理結果メッセージ（明細単位）'; // 異常終了の行を特定するために設定
+    column[25] = '照会ステータス（特定個人情報名単位）'; // 正常終了（税情報が取得できたかどうか）を判別するために設定
+    column[230] = '市町村民税均等割額'; // 税区分を判定するために設定
+    column[254] = '市町村民税所得割額（定額減税前）'; // 税区分を判定するために設定
+
+    // ヘッダー配列を「,」で区切り、税情報照会ファイルの先頭に追加して呼び出し元に返す
+    return column.join(',') + NEWLINE_CHAR_CRLF + text;
+}
+
+/**
  * yyyymmdd形式の日付をDateオブジェクトに変換する
  * @param {string} yyyymmdd yyyymmdd形式の日付
  * @return {Date} 日付文字列を解析して生成されたDateオブジェクト
@@ -2794,22 +2816,19 @@ function separateDate(yyyymmdd, separator = '') {
 }
 
 /**
- * 住基情報内「性別」のコードを「男性」「女性」に変換する
+ * 住基情報内「性別」のコードを「男性」「女性」または空文字に変換する
  * @param {string} genderCode 「1」または「2」の性別コード
- * @param {string} addressNum 宛名番号
- * @param {array} errorAddressNums エラーの宛名番号を格納・出力するための配列
- * @return {string} 「男性」または「女性」の文字列
+ * @return {string} 「男性」または「女性」または空文字
  */
-function convertGenderCode(genderCode, addressNum, errorAddressNums) {
+function convertGenderCode(genderCode) {
     if (genderCode === '1') {
         return '男性';
     }
     else if (genderCode === '2') {
         return '女性';
     }
-    // 性別が「1」「2」以外である場合、宛名番号をエラー表示用配列に格納する
+    // 性別が「1」「2」以外である場合、エラー表示のために空文字を返す
     else {
-        errorAddressNums.push(addressNum);
         return '';
     }
 }
@@ -2829,11 +2848,9 @@ function excludeHyphen(textWithHyphen) {
  * @param {string} relationship2 続柄２のコード
  * @param {string} relationship3 続柄３のコード
  * @param {string} relationship4 続柄４のコード
- * @param {string} addressNum 宛名番号
- * @param {array} errorAddressNums エラーの宛名番号を格納・出力するための配列
- * @return {string} 文字列返還後の続柄
+ * @return {string} 文字列変換後の続柄
  */
-function convertRelationshipCode(relationship1, relationship2, relationship3, relationship4, addressNum, errorAddressNums) {
+function convertRelationshipCode(relationship1, relationship2, relationship3, relationship4) {
     // 続柄コードと変換後の文字列の対応を定義
     const RelationshipCodeMap = {
         '02': '世帯主',
@@ -2865,9 +2882,8 @@ function convertRelationshipCode(relationship1, relationship2, relationship3, re
     if (relationship1 !== '') {
         convertedRelationship.push(RelationshipCodeMap[relationship1] || relationship1);
     }
-    // 続柄１が空の場合は宛名番号を配列に格納し、エラー表示をする
+    // 続柄１が空の場合はエラー表示のため空文字を返す
     else {
-        errorAddressNums.push(addressNum);
         return '';
     }
 
