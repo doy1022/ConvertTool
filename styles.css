@@ -114,7 +114,9 @@ input:checked + .tab {
 /* ▼チェックが入っているラジオボタンに対応するタブの中身を表示する */
 #tabcheck1:checked ~ #tabcontent1,
 #tabcheck2:checked ~ #tabcontent2,
-#tabcheck3:checked ~ #tabcontent3 {
+#tabcheck3:checked ~ #tabcontent3,
+#tabcheck4:checked ~ #tabcontent4,
+#tabcheck5:checked ~ #tabcontent5 {
     display: block;
 }
 

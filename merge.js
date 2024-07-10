@@ -9,6 +9,8 @@ const MIDDLE_FILE_5 = "中間ファイル⑤.csv";
 const MIDDLE_FILE_6 = "中間ファイル⑥.csv";
 const MIDDLE_FILE_7 = "中間ファイル⑦.csv";
 const MIDDLE_FILE_8 = "中間ファイル⑧.csv";
+const MIDDLE_FILE_9 = "中間ファイル⑨.csv";
+const MIDDLE_FILE_10 = "中間ファイル⑩.csv";
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const RESIDENTINFO_INQUIRY_FILE_2 = "住基照会用ファイル②.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
@@ -2270,7 +2272,7 @@ function generateFilesforPushTargetImport() {
                 line[columnIndices[1] || columnIndices[13]], // 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
                 line[columnIndices[2]], // カナ氏名
                 separateDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
-                convertGenderCode(line[columnIndices[4]] ,line[columnIndices[0]] ,genderErrorAddressNums), // 性別（住基情報内のコードを文字列に変換する）
+                convertGenderCode(line[columnIndices[4]], line[columnIndices[0]], genderErrorAddressNums), // 性別（住基情報内のコードを文字列に変換する）
                 excludeHyphen(line[columnIndices[5]]), // 電話番号（ハイフンを除去する）
                 excludeHyphen(line[columnIndices[6]]), // 郵便番号（ハイフンを除去する）
                 line[columnIndices[7]], // 住所
@@ -2280,7 +2282,7 @@ function generateFilesforPushTargetImport() {
                 '', // 異動元方書
                 line[columnIndices[9]].toString().padStart(15, '0'), // 世帯番号
                 '', // 世帯主宛名番号（世帯主行は空にする）
-                convertRelationshipCode(line[columnIndices[10]], line[columnIndices[11]], line[columnIndices[12]], line[columnIndices[13]], line[columnIndices[0]] , relationshipErrorAddressNums), // 続柄（続柄コードを文字列に変換する）
+                convertRelationshipCode(line[columnIndices[10]], line[columnIndices[11]], line[columnIndices[12]], line[columnIndices[13]], line[columnIndices[0]], relationshipErrorAddressNums), // 続柄（続柄コードを文字列に変換する）
                 '1', // 郵送対象者フラグ（郵送対象者のため「1」を設定）
                 line[columnIndices[14]], // 外国人通称名
                 line[columnIndices[15]], // 外国人カナ通称名
@@ -2433,6 +2435,220 @@ function generateFilesforPushTargetImport() {
     }
 }
 
+/* 12. 旧宛名番号に紐づく税情報を取得し、現宛名番号に紐づけ課税区分判定を行う処理*/
+function determineTaxClassfromOldAddressNum() {
+    // 各ファイルのIDを配列に格納する
+    const fileIds = ['file27', 'file28', 'file29'];
+    // 各ファイルのIDを配列に格納する
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 「中間ファイル⑨」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル⑨')) {
+        alert('アップロードするファイル名を「中間ファイル⑨」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル⑨」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 12 処理を開始しました');
+    //showLoading();
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    // 読み込んだファイル内データのマージ処理
+                    const mergedCSV = mergeCSVwithOldAddressNum(...results);
+                    // 課税対象の住民を除外する処理
+                    const excludeTaxableText = filterTaxExcluded(mergedCSV);
+                    // アウトプットファイルのダウンロード処理
+                    downloadCSV(excludeTaxableText, MIDDLE_FILE_10);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 12 処理を終了しました');
+                    // hideLoading();
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+
+    function mergeCSVwithOldAddressNum(...csvFiles) {
+        // 各CSVファイルをヘッダーとデータ行に分解し、配列に格納する
+        const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
+
+        // 各ファイルヘッダー内の「ＦＩ－」を取り除く
+        parsedCSVs.forEach(parsed => parsed.header = removeStrFromHeader(parsed.header, "ＦＩ－"));
+
+        // 各ファイル内の必要なカラムのインデックスを取得する
+        const addressNumIndex1 = parsedCSVs[0].header.indexOf('宛名番号'); // 中間ファイル⑩の宛名番号カラム
+        const causeForRectificationIndex = parsedCSVs[0].header.indexOf('更正事由'); // 中間ファイル⑩の更正事由カラム
+        const incomePercentageIndex = parsedCSVs[0].header.indexOf('所得割額'); // 中間ファイル⑩の所得割額カラム
+        const equalPercentageIndex = parsedCSVs[0].header.indexOf('均等割額'); // 中間ファイル⑩の均等割額カラム
+        const taxClassIndex = parsedCSVs[0].header.indexOf('課税区分'); // 中間ファイル⑩の課税区分カラム
+        const oldAddressNumIndex = parsedCSVs[1].header.indexOf('旧宛名番号'); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの旧宛名番号カラム
+        const addressNumIndex3 = parsedCSVs[2].header.indexOf('宛名番号'); // 賦課マスタファイルの宛名番号カラム
+
+        // 最終的に「現宛名番号の住民票コードに紐づく旧宛名番号」ファイルと「賦課マスタ」をマージした結果を格納する配列を定義する
+        const oldAddressmergedData = [];
+
+        // 一時的に「現宛名番号の住民票コードに紐づく旧宛名番号」ファイルと「賦課マスタ」をマージするためのMap（作業領域）を定義する
+        const oldAddressNumMap = new Map();
+
+        // 「現宛名番号の住民票コードに紐づく旧宛名番号」ファイルをマッピングする
+        parsedCSVs[1].rows.forEach(row => {
+            const oldAddressNum = row[oldAddressNumIndex];
+            const rowObj = parsedCSVs[1].header.reduce((obj, header, i) => {
+                obj[header] = row[i];
+                return obj;
+            }, {});
+            oldAddressNumMap.set(oldAddressNum, rowObj);
+        });
+
+        // 「現宛名番号の住民票コードに紐づく旧宛名番号」ファイルの「旧宛名番号」と、「賦課マスタ」ファイルの「宛名番号」をキーにして、2ファイルをマージする
+        parsedCSVs[2].rows.forEach(row => {
+            const levyAddressNum = row[addressNumIndex3];
+            const rowObj = parsedCSVs[2].header.reduce((obj, header, i) => {
+                obj[header] = row[i];
+                return obj;
+            }, {});
+            if (oldAddressNumMap.has(levyAddressNum)) {
+                // 後続処理では「旧宛名番号」ではなく「現宛名番号」をキーとするため、Mapに格納したデータをkeyを設定しない配列に再格納する
+                const mergedObj = { ...oldAddressNumMap.get(levyAddressNum), ...rowObj };
+                oldAddressmergedData.push(mergedObj);
+            }
+        });
+
+        // 2ファイルをマージしたデータに対し、「所得割額」「均等割額」「更正事由」カラムの値を利用して課税区分判定を行う
+        oldAddressmergedData.forEach((value) => {
+            // 条件分岐に使用するカラムの値を定義する
+            const incomePercentage = Number(value['所得割額']);
+            const equalPercentage = Number(value['均等割額']);
+            const causeForCorrection = String(value['更正事由']);
+            // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
+            if (incomePercentage == 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
+                value['課税区分'] = '1';
+                // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+            } else if (incomePercentage == 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+                value['課税区分'] = '2';
+                // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
+            } else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+                value['課税区分'] = '3';
+                // 「所得割額」が1以上のときは「均等割額」が1以上になるはずのため、「均等割額」が0のものはエラーとして投げる
+            } else if (incomePercentage > 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
+                throw new Error('【宛名番号：' + String(value['宛名番号']) + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
+                // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
+            } else if (causeForCorrection.startsWith("03")) {
+                value['課税区分'] = '4';
+            } else {
+                value['課税区分'] = '';
+            }
+        });
+
+        // 中間ファイル⑩の「宛名番号」がmergedData内の「現宛名番号」と一致する行について、各税情報カラムの値を更新する処理
+        const updatedRows = parsedCSVs[0].rows.map(line => {
+            const addressNum = line[addressNumIndex1];
+            // 中間ファイル⑩の「宛名番号」がmergedData内の「現宛名番号」と一致する行を検索する
+            const matchedData = oldAddressmergedData.find(data => data['現宛名番号'] === addressNum);
+            if (matchedData) {
+                // 中間ファイル⑩内の「所得割額」「均等割額」「課税区分」「更正事由」カラムの値を更新する
+                line[incomePercentageIndex] = matchedData['所得割額'];
+                line[equalPercentageIndex] = matchedData['均等割額'];
+                line[taxClassIndex] = matchedData['課税区分'];
+                line[causeForRectificationIndex] = matchedData['更正事由'];
+            }
+            return line;
+        });
+
+        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+        return formatOutputFile(parsedCSVs[0].header, updatedRows, NEWLINE_CHAR_CRLF);
+    }
+}
+
+/* 13.再番号連携対象の住民に関して、番号連携用ファイル（DAT）を作成する処理 */
+function generateTaxInfoReferenceFile() {
+    // 各ファイルのIDを配列に格納する
+    const fileIds = ['file30'];
+    // 出力ファイル名を定義する
+    const taxInfoReferenceFile = "P640R110_" + getCurrentTime().replace(/[:.\-\s]/g, '').trim().slice(0, 14); // 税情報照会用ファイル（YYYYMMDDHHmmssの14桁）
+
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 13 処理を開始しました');
+    //showLoading();
+
+    // 読み込んだデータをresults配列の対応する位置に保存する
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+            let text = e.target.result;
+
+            // 必要な項目があるかチェックする
+            const { header, rows } = parseCSV(text);
+            const requiredColumns = [
+                '宛名番号',
+                '照会先自治体コード'
+            ];
+            const columnIndices = requiredColumns.map(col => header.indexOf(col));
+            // 足りないカラムをチェック
+            const missingColumns = requiredColumns.filter((col, index) => columnIndices[index] === -1);
+
+            if (missingColumns.length > 0) {
+                throw new Error(`次の列が見つかりませんでした： ${missingColumns.join(', ')}\nファイルを確認してください。`);
+            }
+
+            // ヘッダー項目をリネーム（「照会先自治体コード」→「転入元都道府県市区町村コード」へリネーム）して、再度カンマで結合、改行で区切られた文字列に変換する
+            const changeHeaderText = formatOutputFile(['宛名番号', '転入元都道府県市区町村コード'], rows, NEWLINE_CHAR_CRLF)
+
+            // ヘッダー名をリネームしたファイルを税情報照会用ファイルの形式に変換する
+            const taxInfoReferenceText = generateFixedLengthFile(changeHeaderText, 'JT01010000000214', 'TM00000000000002');
+            if (!taxInfoReferenceText) {
+                logger.warn('■ファイル名：' + taxInfoReferenceFile + ' >> 出力対象レコードが存在しませんでした。');
+            } else {
+                downloadCSV(taxInfoReferenceText, taxInfoReferenceFile, true);
+            }
+        } catch (error) {
+            // catchしたエラーを表示
+            logger.error(error);
+        } finally {
+            logger.info('STEP 13 処理を終了しました');
+            //hideLoading();
+        }
+    };
+    // onloadイベントを発火
+    reader.readAsText(files[0]);
+}
+
+
 /* 以下、使いまわすメソッド（汎用処理）ここから */
 
 /**
@@ -2567,10 +2783,10 @@ function parseDate(yyyymmdd) {
 /**
  * yyyymmdd形式の日付を、「yyyy{separator}mm{separator}dd」形式に変換する
  * @param {string} yyyymmdd yyyymmdd形式の日付
- * @param {string} separator 日付の区切り文字（デフォルトはfalse）
+ * @param {string} separator 日付の区切り文字（デフォルトは空文字）
  * @return {string} 日付文字列を分割して生成された文字列
  */
-function separateDate(yyyymmdd, separator) {
+function separateDate(yyyymmdd, separator = '') {
     const year = yyyymmdd.substring(0, 4);
     const month = yyyymmdd.substring(4, 6);
     const day = yyyymmdd.substring(6, 8);
