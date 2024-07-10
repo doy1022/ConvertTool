@@ -19,7 +19,11 @@
             <input type="radio" name="tabset" id="tabcheck2" class="tabBtn"><label for="tabcheck2"
                 class="tab">公金口座照会用ファイルを作成する</label>
             <input type="radio" name="tabset" id="tabcheck3" class="tabBtn"><label for="tabcheck3"
-                class="tab">ServiceNowにインポートするファイルを作成する</label>
+                class="tab">【直接振込向け】ServiceNowインポート用ファイルを作成する</label>
+            <input type="radio" name="tabset" id="tabcheck4" class="tabBtn"><label for="tabcheck4"
+                class="tab">税情報照会用ファイルを再度作成する</label>
+            <input type="radio" name="tabset" id="tabcheck5" class="tabBtn"><label for="tabcheck5"
+                class="tab">【確認書向け】ServiceNowにインポートするファイルと税情報不明住民のリストを作成する</label>
             <div class="tabcontent" id="tabcontent1">
                 <h1>0.賦課マスタ・個人基本マスタをマージする</h1>
                 <form id="csvForm0">
@@ -140,6 +144,56 @@
                     <label for="file24">中間ファイル⑦をアップロードしてください:</label>
                     <input type="file" id="file24" accept=".csv"><br><br>
                     <button type="button" onclick="generateFilesforPushTargetImport()">上記4ファイルを作成する</button>
+                </form>
+            </div>
+            <div class="tabcontent" id="tabcontent4">
+                <h1>11.国内住登無し住民を「未申告」として、中間ファイルの課税区分を更新する</h1>
+                <form id="csvForm18">
+                    <label for="file25">中間ファイル⑧をアップロードしてください:</label>
+                    <input type="file" id="file25" accept=".csv"><br><br>
+                    <label for="file26">国内住登無し住民ファイルをアップロードしてください:</label>
+                    <input type="file" id="file26" accept=".csv"><br><br>
+                    <button type="button" onclick="mergePublicFundAccountInfo()">中間ファイル⑨を作成する</button>
+                </form>
+
+                <h1>12.旧宛名番号が存在する住民に関して、旧宛名番号の課税区分と現宛名番号を紐づける</h1>
+                <form id="csvForm19">
+                    <label for="file27">中間ファイル⑨をアップロードして下さい:</label>
+                    <input type="file" id="file27" accept=".csv"><br><br>
+                    <label for="file28">現宛名番号の住民票コードに紐づく旧宛名番号ファイルをアップロードして下さい:</label>
+                    <input type="file" id="file28" accept=".csv"><br><br>
+                    <label for="file29">賦課マスタをアップロードして下さい:</label>
+                    <input type="file" id="file29" accept=".csv"><br><br>
+                    <button type="button" onclick="determineTaxClassfromOldAddressNum()">中間ファイル⑩を作成する</button>
+                </form>
+
+                <h1>13.再番号連携対象の住民に関して、番号連携用ファイルを作成する</h1>
+                <form id="csvForm20">
+                    <label for="file30">再番号連携ファイルをアップロードしてください:</label>
+                    <input type="file" id="file30" accept=".csv"><br><br>
+                    <button type="button" onclick="generateTaxInfoReferenceFile()">税情報無し対象者ファイルを作成する</button>
+                </form>
+            </div>
+            <div class="tabcontent" id="tabcontent5">
+                <h1>14.番号連携照会結果（税情報）ファイルから課税区分を判別し、中間ファイルを更新する</h1>
+                <form id="csvForm21">
+                    <label for="file31">中間ファイル⑩をアップロードしてください:</label>
+                    <input type="file" id="file31" accept=".csv"><br><br>
+                    <label for="file32">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
+                    <input type="file" id="file32" accept=".DAT"><br><br>
+                    <button type="button" onclick="updateTaxInfoByInquiryResult()">中間ファイル⑪を作成する</button>
+                </form>
+
+                <h1>15.下記の3ファイルを作成する</h1>
+                <ul>
+                    <li>ServiceNowにインポートする「給付対象者ファイル」</li>
+                    <li>税情報不明住民リスト</li>
+                    <li>中間ファイル⑫</li>
+                </ul>
+                <form id="csvForm22">
+                    <label for="file33">中間ファイル⑪をアップロードしてください:</label>
+                    <input type="file" id="file24" accept=".csv"><br><br>
+                    <button type="button" onclick="generateFilesforPushTargetImport()">上記3ファイルを作成する</button>
                 </form>
             </div>
         </div>
