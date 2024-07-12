@@ -124,9 +124,29 @@
                 </form>
             </div>
             <div class="tabcontent" id="tabcontent3">
+                <h1>追加対応1.賦課マスタと番号連携照会結果（税情報）ファイルをマージする</h1>
+                <form id="csvForm23">
+                    <label for="file34">賦課マスタをアップロードしてください:</label>
+                    <input type="file" id="file34" accept=".csv"><br><br>
+                    <label for="file35">番号連携照会結果（税情報）ファイルをアップロードしてください:</label>
+                    <input type="file" id="file35" accept=".DAT"><br><br>
+                    <button type="button" onclick="mergeTaxInfoFiles()">税情報マスタファイルを作成する</button>
+                </form>
+
+                <h1>追加対応2.世帯全員が所得割課税者 or 均等割のみ課税に扶養されている住民を除外する</h1>
+                <form id="csvForm24">
+                    <label for="file36">中間ファイル⑥をアップロードしてください:</label>
+                    <input type="file" id="file36" accept=".csv"><br><br>
+                    <label for="file37">税情報マスタをアップロードしてください:</label>
+                    <input type="file" id="file37" accept=".csv"><br><br>
+                    <label for="file38">個人基本マスタをアップロードしてください:</label>
+                    <input type="file" id="file38" accept=".csv"><br><br>
+                    <button type="button" onclick="additionalExclusion()">中間ファイル⑥-追加対応済みを作成する</button>
+                </form>
+
                 <h1>9.中間ファイル⑥と公金口座照会結果ファイルをマージする</h1>
                 <form id="csvForm16">
-                    <label for="file22">中間ファイル⑥をアップロードしてください:</label>
+                    <label for="file22">中間ファイル⑥-追加対応済みをアップロードしてください:</label>
                     <input type="file" id="file22" accept=".csv"><br><br>
                     <label for="file23">番号連携照会結果（公金受取口座情報）ファイルをアップロードしてください:</label>
                     <input type="file" id="file23" accept=".DAT"><br><br>
@@ -192,7 +212,7 @@
                 </ul>
                 <form id="csvForm22">
                     <label for="file33">中間ファイル⑪をアップロードしてください:</label>
-                    <input type="file" id="file24" accept=".csv"><br><br>
+                    <input type="file" id="file33" accept=".csv"><br><br>
                     <button type="button" onclick="generateFilesforPushTargetImport()">上記3ファイルを作成する</button>
                 </form>
             </div>

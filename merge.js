@@ -7,6 +7,7 @@ const MIDDLE_FILE_3 = "中間ファイル③.csv";
 const MIDDLE_FILE_4 = "中間ファイル④.csv";
 const MIDDLE_FILE_5 = "中間ファイル⑤.csv";
 const MIDDLE_FILE_6 = "中間ファイル⑥.csv";
+const MIDDLE_FILE_6_ADDITIONAL_EXCLUSION = "中間ファイル⑥-追加対応済み.csv";
 const MIDDLE_FILE_7 = "中間ファイル⑦.csv";
 const MIDDLE_FILE_8 = "中間ファイル⑧.csv";
 const MIDDLE_FILE_9 = "中間ファイル⑨.csv";
@@ -17,6 +18,7 @@ const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
 const BENEFICIARY_FILE = '新たな給付_給付対象者.csv';
 const PUSH_TARGET_FLG_FILE = '新たな給付_直接振込対象者.csv';
 const PUBLIC_ACCOUNT_FILE = '新たな給付_公金受取口座情報.csv';
+const TAX_INFO_MASTER = '税情報マスタ.csv';
 const NUMBER_OF_DATA_DIVISION = 10000; // 税情報データ分割数
 const NEWLINE_CHAR_CRLF = '\r\n'; // 改行コード：CRLF
 
@@ -1867,6 +1869,474 @@ function generateInquiryFiles() {
         return [['宛名番号', '住民票コード'].join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 追加対応1. 賦課マスタと番号連携結果（税情報）ファイルをマージし、税情報マスタファイルを作成する処理*/
+function mergeTaxInfoFiles() {
+    const fileIds = ['file34', 'file35'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files, true);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」もしくは「.DAT」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('追加対応1 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    const mergedTaxInfoText = generateTaxInfoMasterFile(results[0], results[1]);
+                    downloadCSV(mergedTaxInfoText, TAX_INFO_MASTER);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('追加対応1 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+
+    function generateTaxInfoMasterFile(csvText1, csvText2) {
+        // 税情報照会結果ファイルがヘッダー無しファイルのため、ファイル一行目ヘッダーを追加する
+        csvText2 = createHeaderForTaxInfoInquiryFile(csvText2);
+
+        // CSVテキストを行ごとに分割して配列に変換
+        const arrayFromLevyMaster = parseCSV(csvText1);
+        const arrayFromInquiryResult = parseCSV(csvText2);
+
+        // ヘッダー行を取得（賦課マスタのヘッダー行からは「ＦＩ－」を取り除く）
+        const levyMasterHeader = removeStrFromHeader(arrayFromLevyMaster.header, "ＦＩ－");
+        const inquiryResultHeader = arrayFromInquiryResult.header;
+
+        // 賦課マスタの必要カラムindexを指定する
+        const addressNumIndex1 = levyMasterHeader.indexOf('宛名番号');
+
+        // 税情報照会結果ファイルの必要カラムindexを指定する
+        const addressNumIndex2 = inquiryResultHeader.indexOf('宛名番号');
+        const inquiryStatusFromParticularsIndex = inquiryResultHeader.indexOf('照会ステータス（明細単位）');
+        const inquiryStatusFromPersonalInfoIndex = inquiryResultHeader.indexOf('照会ステータス（特定個人情報名単位）');
+        const equalBracketIndex = inquiryResultHeader.indexOf('市町村民税均等割額');
+        const incomePercentageIndex = inquiryResultHeader.indexOf('市町村民税所得割額（定額減税前）');
+
+        // 各ファイルのマージ結果を格納する配列を定義する
+        const map = new Map();
+
+        // 賦課マスタのデータをMapに格納する
+        arrayFromLevyMaster.rows.forEach(row => {
+            const levyAddressNum = row[addressNumIndex1];
+            // headersとrowからオブジェクトを生成する
+            const rowObj = levyMasterHeader.reduce((obj, header, i) => {
+                obj[header] = row[i];
+                return obj;
+            }, {});
+            map.set(levyAddressNum, rowObj);
+        });
+
+        // 税情報照会結果ファイルのデータをMapに格納する
+        arrayFromInquiryResult.rows.forEach(row => {
+            // 税情報照会結果の宛名番号は左側0埋め15桁になっているため、右10桁を取得する
+            const inquiryAddressNum = row[addressNumIndex2].slice(-10);
+            const inquiryStatusFromParticulars = String(row[inquiryStatusFromParticularsIndex]);
+            const inquiryStatusFromPersonalInfo = String(row[inquiryStatusFromPersonalInfoIndex]);
+
+            // headersとrowからオブジェクトを生成する
+            const rowObj = inquiryResultHeader.reduce((obj, header, i) => {
+                obj[header] = row[i];
+                return obj;
+            }, {});
+
+            // 2種類の照会ステータスを確認し、照会が正常に終了している場合にはマージ（もしくは行追加）処理を実行する
+            if (inquiryStatusFromParticulars === '09' && inquiryStatusFromPersonalInfo === '01') {
+                // 賦課マスタに存在する宛名番号の場合、マージ処理を実行する
+                if (map.has(inquiryAddressNum)) {
+                    // todo:エラー表示する
+                    const existingRow = map.get(inquiryAddressNum);
+                    existingRow['均等割額'] = row[equalBracketIndex];
+                    existingRow['所得割額'] = row[incomePercentageIndex];
+                    map.set(inquiryAddressNum, existingRow);
+                }
+                // 賦課マスタに無い宛名番号の場合、最終行に続く形で行ごと追加する
+                else {
+                    const newRow = levyMasterHeader.reduce((obj, header) => {
+                        obj[header] = "";
+                        return obj;
+                    }, {});
+                    newRow['宛名番号'] = inquiryAddressNum;
+                    newRow['均等割額'] = row[equalBracketIndex];
+                    newRow['所得割額'] = row[incomePercentageIndex];
+                    map.set(inquiryAddressNum, newRow);
+                }
+            }
+        });
+
+        const outputRows = [];
+        map.forEach(value => {
+            const row = levyMasterHeader.map(header => value[header] || '');
+            outputRows.push(row.join(','));
+        });
+
+        // フィルタリングされた行をCSV形式に戻す
+        // todo :function作成
+        return [levyMasterHeader, ...outputRows].join('\r\n') + '\r\n';
+    }
+}
+
+/* 追加対応2. 世帯全員が所得割課税者 or 均等割のみ課税に扶養されている住民を除外する処理 */
+function additionalExclusion() {
+    // 各ファイルのIDを配列に格納する
+    const fileIds = ['file36', 'file37', 'file38'];
+    // 各ファイルのIDを配列に格納する
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル⑥」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル⑥')) {
+        alert('アップロードするファイル名を「中間ファイル⑥」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル⑥」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル⑥」がインプットされたことを確認する（前方一致で確認）
+    if (!files[1].name.startsWith('税情報マスタ')) {
+        alert('アップロードするファイル名を「税情報マスタ」から始まるものにして下さい。');
+        return; // ファイル名が「税情報マスタ」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('追加対応2 処理を開始しました');
+
+    // FileReaderオブジェクトを生成し、各ファイルの読み込みを行う（map処理内にFileReaderの生成を含む）
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込む
+    readers.forEach((reader, index) => {
+        // ファイルの読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+        reader.onload = function (e) {
+            // 読み込んだデータをresults配列に保存する
+            // e.target.result:FileReaderが読み込んだファイルの内容（文字列）
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    // 読み込んだファイル内データのマージをおこなう
+                    const additionalExclusionText = excludeHouseholdsDependentTaxpayer(...results);
+                    downloadCSV(additionalExclusionText, MIDDLE_FILE_6_ADDITIONAL_EXCLUSION);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('追加対応2 処理を終了しました');
+                }
+            }
+        };
+
+        // onloadイベントを発火
+        reader.readAsText(files[index]);
+    });
+
+    function excludeHouseholdsDependentTaxpayer(...csvFiles) {
+        // 各CSVファイルをヘッダーとデータ行に分解し、1行ずつ配列に格納する
+        const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
+        // 個人基本マスタヘッダー内の「ＦＩ－」を取り除く
+        parsedCSVs[2].header = removeStrFromHeader(parsedCSVs[2].header, "ＦＩ－");
+        // 中間ファイル⑥の全ヘッダーと、各ファイルの必要カラムのヘッダーをマージする
+        const fullHeader = Array.from(new Set([...parsedCSVs[0].header, "配偶者特別控除", "個人基本廃止理由", "夫婦関連者種別コード", "夫婦関連者宛名番号", "扶養関連者宛名番号", "専従関連者種別コード", "専従関連者宛名番号"]));
+        // 出力用のCSVデータを定義する
+        const output = [fullHeader.join(',')];
+        // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
+        const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('宛名番号'));
+
+        // 中間ファイル⑥を基準にマッピングし、各ファイルのマージ処理を行う
+        const map = new Map();
+
+        parsedCSVs[0].rows.forEach(row => {
+            const addressNum = row[addressIndex[0]];
+            // headersとrowからオブジェクトを生成する
+            const rowObj = parsedCSVs[0].header.reduce((obj, header, i) => {
+                obj[header] = row[i];
+                return obj;
+            }, {});
+            map.set(addressNum, rowObj);
+        });
+
+        // 税情報マスタのマージ対象カラム（後続の判定に必要な「配偶者特別控除」のみ）を指定する
+        const levyColumns = ["配偶者特別控除"];
+
+        // 税情報マスタのマージ処理
+        parsedCSVs[1].rows.forEach(row => {
+            const levyAddressNum = row[addressIndex[1]];
+            if (map.has(levyAddressNum)) {
+                // headersとrowからオブジェクトを生成する
+                const rowObj = parsedCSVs[1].header.reduce((obj, header, i) => {
+                    // マージ対象のカラムの場合、オブジェクトに追加する
+                    if (levyColumns.includes(header)) {
+                        obj[header] = row[i];
+                    }
+                    return obj;
+                }, {});
+                // 対象のカラムの場合マージ処理を実行する
+                map.set(levyAddressNum, { ...map.get(levyAddressNum), ...rowObj });
+            }
+        });
+
+        // 個人基本マスタのマージ対象カラム（後続の判定に必要な「個人基本廃止理由」「夫婦関連者種別コード」「夫婦関連者宛名番号」「扶養関連者宛名番号」「専従関連者種別コード」「専従関連者宛名番号」）を指定する
+        const personalBasicColumns = ["個人基本廃止理由", "夫婦関連者種別コード", "夫婦関連者宛名番号", "扶養関連者宛名番号", "専従関連者種別コード", "専従関連者宛名番号"];
+
+        // 個人基本マスタのマージ処理
+        parsedCSVs[2].rows.forEach(row => {
+            const personalBasicAddressNum = row[addressIndex[2]];
+            if (map.has(personalBasicAddressNum)) {
+                // headersとrowからオブジェクトを生成する
+                const rowObj = parsedCSVs[2].header.reduce((obj, header, i) => {
+                    // マージ対象のカラムの場合、オブジェクトに追加する
+                    if (personalBasicColumns.includes(header)) {
+                        obj[header] = row[i];
+                    }
+                    return obj;
+                }, {});
+                // 対象のカラムの場合マージ処理を実行する
+                map.set(personalBasicAddressNum, { ...map.get(personalBasicAddressNum), ...rowObj });
+            }
+        });
+
+        // 4つの条件から扶養を受けている住民（被扶養者）を検索し、該当レコードの世帯番号、関連者宛名番号（扶養者の宛名番号）、扶養形式（後続処理に使用するフラグ）を配列に格納する
+        const dependentTaxpayerSet = [];
+
+        map.forEach(value => {
+            // 条件① : 「夫婦関連者種別コード」が11,13,15,17,19,1B,1D,1F,1Hのいずれかであるかつ、「夫婦関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
+            if (['11', '13', '15', '17', '19', '1B', '1D', '1F', '1H'].includes(value['夫婦関連者種別コード']) && value['夫婦関連者宛名番号'] && !value['個人基本廃止理由']) {
+                dependentTaxpayerSet.push({
+                    世帯番号: value['世帯番号'],
+                    扶養者宛名番号: value['夫婦関連者宛名番号'],
+                    扶養形式: '控配'
+                });
+            }
+            // 条件② : 条件①に当てはまらないかつ、「扶養関連者宛名番号」が入力されているかつ、個人基本廃止理由が空であるレコードを検索する
+            else if (value['扶養関連者宛名番号'] && !value['個人基本廃止理由']) {
+                dependentTaxpayerSet.push({
+                    世帯番号: value['世帯番号'],
+                    扶養者宛名番号: value['扶養関連者宛名番号'],
+                    扶養形式: '扶養'
+                });
+            }
+            // 条件③ : 条件①②に当てはまらないかつ、「夫婦関連者種別コード」が10であるかつ、「配偶者特別控除」が0より大きいかつ、「夫婦関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
+            else if (value['夫婦関連者種別コード'] === '10' && value['配偶者特別控除'] > 0 && value['夫婦関連者宛名番号'] && !value['個人基本廃止理由']) {
+                dependentTaxpayerSet.push({
+                    世帯番号: value['世帯番号'],
+                    扶養者宛名番号: value['夫婦関連者宛名番号'],
+                    扶養形式: '配偶者'
+                });
+            }
+            // 条件④ : 条件①②③に当てはまらないかつ、「専従関連者種別コード」が41であるかつ、「専従関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
+            else if (value['専従関連者種別コード'] === '41' && value['専従関連者宛名番号'] && !value['個人基本廃止理由']) {
+                dependentTaxpayerSet.push({
+                    世帯番号: value['世帯番号'],
+                    扶養者宛名番号: value['専従関連者宛名番号'],
+                    扶養形式: '専従'
+                });
+            }
+        });
+
+    //     // dependentTaxpayerSetの各データの扶養者宛名番号について、税情報マスタファイル内「宛名番号」カラムに検索をかける
+    //     // todo 引数、forでいいかも　Setじゃない奴の名前修正
+    //     dependentTaxpayerSet.forEach((dependentTaxpayer, index) => {
+    //         // 検索ヒットした行の更正事由、所得割額、均等割額の値を参照し、課税区分判定を実施する
+    //         parsedCSVs[1].rows.forEach(row => {
+    //             if (row[parsedCSVs[1].header.indexOf('宛名番号')] === dependentTaxpayerSet[index]['扶養者宛名番号']) {
+    //                 const causeForCorrection = String(row[parsedCSVs[1].header.indexOf('更正事由')]); // 更正事由
+    //                 const incomePercentage = Number(row[parsedCSVs[1].header.indexOf('所得割額')]); // 所得割額
+    //                 const equalPercentage = Number(row[parsedCSVs[1].header.indexOf('均等割額')]); // 均等割額
+    //                 let taxClass; // 最終的に配列に格納する課税区分
+
+    //                 // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
+    //                 if (incomePercentage == 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
+    //                     taxClass = '1';
+    //                 }
+    //                 // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+    //                 else if (incomePercentage == 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+    //                     taxClass = '2';
+    //                 }
+    //                 // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
+    //                 else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+    //                     taxClass = '3';
+    //                 }
+    //                 // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
+    //                 else if (causeForCorrection.startsWith("03")) {
+    //                     taxClass = '4';
+    //                 }
+    //                 else {
+    //                     taxClass = '';
+    //                 }
+
+    //                 // 課税区分を配列に追加格納する
+    //                 dependentTaxpayerSet[index] = {
+    //                     ...dependentTaxpayerSet[index],
+    //                     扶養者課税区分: taxClass
+    //                 };
+    //             }
+    //         });
+    //     });
+
+        const headerMap = parsedCSVs[1].header.reduce((map, header, index) => {
+            map[header] = index;
+            return map;
+        }, {});
+        
+        dependentTaxpayerSet.forEach((dependentTaxpayer, index) => {
+            // 宛名番号が一致する行をフィルタリング
+            const targetRows = parsedCSVs[1].rows.filter(row => 
+                row[headerMap['宛名番号']] === dependentTaxpayer['扶養者宛名番号']
+            );
+        
+            targetRows.forEach(row => {
+                const causeForCorrection = String(row[headerMap['更正事由']]); // 更正事由
+                const incomePercentage = Number(row[headerMap['所得割額']]); // 所得割額
+                const equalPercentage = Number(row[headerMap['均等割額']]); // 均等割額
+                let taxClass; // 最終的に配列に格納する課税区分
+        
+                // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
+                if (incomePercentage === 0 && equalPercentage === 0 && !causeForCorrection.startsWith("03")) {
+                    taxClass = '1';
+                }
+                // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+                else if (incomePercentage === 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+                    taxClass = '2';
+                }
+                // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
+                else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+                    taxClass = '3';
+                }
+                // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
+                else if (causeForCorrection.startsWith("03")) {
+                    taxClass = '4';
+                }
+                else {
+                    taxClass = '';
+                }
+        
+                // 課税区分を配列に追加格納する
+                dependentTaxpayerSet[index] = {
+                    ...dependentTaxpayerSet[index],
+                    扶養者課税区分: taxClass
+                };
+            });
+        });
+        
+        // dependentTaxpayerSet内、「扶養者課税区分」が「2（＝均等割のみ課税）」もしくは「3（＝課税）」であるデータのみ抽出する（後続処理をわかりやすくするため）
+        const filteredDependentTaxpayerSet = dependentTaxpayerSet.filter(dependentTaxpayer => dependentTaxpayer['扶養者課税区分'] === '2' || dependentTaxpayer['扶養者課税区分'] === '3');
+
+        // 抽出したデータごとに後続処理を実施する
+        filteredDependentTaxpayerSet.forEach(filtereddependentTaxpayer => {
+            // 検索ヒットした住民の扶養者宛名番号カラムの値をいれるための配列（後続処理で判定用として使用する配列）を定義する
+            const relatedAddressNums = [];
+
+            // map（中間ファイル＋税情報マスタ＋個人基本マスタ）内「世帯番号」が、filteredDependentTaxpayerSetの「世帯番号」と一致するものを検索し、ヒットした全行の「扶養者宛名番号」を配列に格納する
+            map.forEach((value, key) => {
+                if (value['世帯番号'] === filtereddependentTaxpayer['世帯番号']) {
+                    // 扶養者宛名番号として「夫婦関連者宛名番号」「扶養関連者宛名番号」「専従関連者宛名番号」の種類があるため、filteredDependentTaxpayerSet内の「扶養形式」によって取得するカラムを判定する
+                    // 扶養形式が「控配」もしくは「配偶者」の場合、「夫婦関連者宛名番号」を取得する（扶養者宛名番号が無い場合もあるため、その場合は空文字列を追加する）
+                    if (filtereddependentTaxpayer['扶養形式'] === '控配' || filtereddependentTaxpayer['扶養形式'] === '配偶者') {
+                        relatedAddressNums.push(value['夫婦関連者宛名番号'] || '');
+                    }
+                    // 扶養形式が「扶養」の場合、「扶養関連者宛名番号」を取得する（扶養者宛名番号が無い場合もあるため、その場合は空文字列を追加する）
+                    else if (filtereddependentTaxpayer['扶養形式'] === '扶養') {
+                        relatedAddressNums.push(value['扶養関連者宛名番号'] || '');
+                    }
+                    // 扶養形式が「専従」の場合、「専従関連者宛名番号」を取得する（扶養者宛名番号が無い場合もあるため、その場合は空文字列を追加する）
+                    else if (filtereddependentTaxpayer['扶養形式'] === '専従') {
+                        relatedAddressNums.push(value['専従関連者宛名番号'] || '');
+                    }
+                }
+            });
+
+            // 取得した扶養者宛名番号配列の中に、filteredDependentTaxpayerSetの「扶養者宛名番号」と一致しないものがあるか判定する
+            const allMatchJudge = relatedAddressNums.every(addressNum => addressNum === filtereddependentTaxpayer['扶養者宛名番号']);
+            // 判定結果でTrue（全行の扶養者宛名番号の値とfilteredDependentTaxpayerSetの扶養者の値が一致している）場合、同世帯番号に属する全レコードをmapから除外する
+            if (allMatchJudge) {
+                // 削除対象のキーを収集する配列を定義
+                const keysToDelete = [];
+                
+                // 削除対象のキーを収集
+                map.forEach((value, key) => {
+                    if (value['世帯番号'] === filtereddependentTaxpayer['世帯番号']) {
+                        keysToDelete.push(key);
+                    }
+                });
+        
+                // 収集したキーを使ってmapからエントリーを削除
+                keysToDelete.forEach(key => map.delete(key));
+            }
+        });
+
+        map.forEach(value => {
+            const row = fullHeader.map(header => value[header] || '');
+            output.push(row.join(','));
+        });
+        return output.join('\r\n') + '\r\n';
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* 9.中間ファイル⑥と公金口座照会結果ファイルをマージする処理 */
 function mergePublicFundAccountInfo() {
