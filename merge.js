@@ -1947,6 +1947,7 @@ function mergeTaxInfoFiles() {
         const inquiryStatusFromPersonalInfoIndex = inquiryResultHeader.indexOf('照会ステータス（特定個人情報名単位）');
         const equalBracketIndex = inquiryResultHeader.indexOf('市町村民税均等割額');
         const incomePercentageIndex = inquiryResultHeader.indexOf('市町村民税所得割額（定額減税前）');
+        const specialExemptionForSpousesIndex = inquiryResultHeader.indexOf('配偶者特別控除額');
 
         // 各ファイルのマージ結果を格納する配列を定義する
         const map = new Map();
@@ -1983,6 +1984,7 @@ function mergeTaxInfoFiles() {
                     const existingRow = map.get(inquiryAddressNum);
                     existingRow['均等割額'] = row[equalBracketIndex];
                     existingRow['所得割額'] = row[incomePercentageIndex];
+                    existingRow['配偶者特別控除'] = row[specialExemptionForSpousesIndex];
                     map.set(inquiryAddressNum, existingRow);
                 }
                 // 賦課マスタに無い宛名番号の場合、最終行に続く形で行ごと追加する
@@ -1994,6 +1996,7 @@ function mergeTaxInfoFiles() {
                     newRow['宛名番号'] = inquiryAddressNum;
                     newRow['均等割額'] = row[equalBracketIndex];
                     newRow['所得割額'] = row[incomePercentageIndex];
+                    newRow['配偶者特別控除'] = row[specialExemptionForSpousesIndex];
                     map.set(inquiryAddressNum, newRow);
                 }
             }
@@ -3246,6 +3249,7 @@ function createHeaderForTaxInfoInquiryFile(text) {
     column[23] = '照会ステータス（明細単位）'; // 正常終了（税情報が取得できたかどうか）を判別するために設定
     column[24] = '照会処理結果メッセージ（明細単位）'; // 異常終了の行を特定するために設定
     column[25] = '照会ステータス（特定個人情報名単位）'; // 正常終了（税情報が取得できたかどうか）を判別するために設定
+    column[164] = '配偶者特別控除額'; // 扶養での除外条件判定のために設定
     column[230] = '市町村民税均等割額'; // 税区分を判定するために設定
     column[254] = '市町村民税所得割額（定額減税前）'; // 税区分を判定するために設定
 
