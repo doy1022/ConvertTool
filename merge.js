@@ -2176,63 +2176,65 @@ function additionalExclusion() {
             }
         });
 
-    //     // dependentTaxpayerSetの各データの扶養者宛名番号について、税情報マスタファイル内「宛名番号」カラムに検索をかける
-    //     // todo 引数、forでいいかも　Setじゃない奴の名前修正
-    //     dependentTaxpayerSet.forEach((dependentTaxpayer, index) => {
-    //         // 検索ヒットした行の更正事由、所得割額、均等割額の値を参照し、課税区分判定を実施する
-    //         parsedCSVs[1].rows.forEach(row => {
-    //             if (row[parsedCSVs[1].header.indexOf('宛名番号')] === dependentTaxpayerSet[index]['扶養者宛名番号']) {
-    //                 const causeForCorrection = String(row[parsedCSVs[1].header.indexOf('更正事由')]); // 更正事由
-    //                 const incomePercentage = Number(row[parsedCSVs[1].header.indexOf('所得割額')]); // 所得割額
-    //                 const equalPercentage = Number(row[parsedCSVs[1].header.indexOf('均等割額')]); // 均等割額
-    //                 let taxClass; // 最終的に配列に格納する課税区分
+        //     // dependentTaxpayerSetの各データの扶養者宛名番号について、税情報マスタファイル内「宛名番号」カラムに検索をかける
+        //     // todo 引数、forでいいかも　Setじゃない奴の名前修正
+        //     dependentTaxpayerSet.forEach((dependentTaxpayer, index) => {
+        //         // 検索ヒットした行の更正事由、所得割額、均等割額の値を参照し、課税区分判定を実施する
+        //         parsedCSVs[1].rows.forEach(row => {
+        //             if (row[parsedCSVs[1].header.indexOf('宛名番号')] === dependentTaxpayerSet[index]['扶養者宛名番号']) {
+        //                 const causeForCorrection = String(row[parsedCSVs[1].header.indexOf('更正事由')]); // 更正事由
+        //                 const incomePercentage = Number(row[parsedCSVs[1].header.indexOf('所得割額')]); // 所得割額
+        //                 const equalPercentage = Number(row[parsedCSVs[1].header.indexOf('均等割額')]); // 均等割額
+        //                 let taxClass; // 最終的に配列に格納する課税区分
 
-    //                 // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
-    //                 if (incomePercentage == 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
-    //                     taxClass = '1';
-    //                 }
-    //                 // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
-    //                 else if (incomePercentage == 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
-    //                     taxClass = '2';
-    //                 }
-    //                 // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
-    //                 else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
-    //                     taxClass = '3';
-    //                 }
-    //                 // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
-    //                 else if (causeForCorrection.startsWith("03")) {
-    //                     taxClass = '4';
-    //                 }
-    //                 else {
-    //                     taxClass = '';
-    //                 }
+        //                 // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
+        //                 if (incomePercentage == 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
+        //                     taxClass = '1';
+        //                 }
+        //                 // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+        //                 else if (incomePercentage == 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+        //                     taxClass = '2';
+        //                 }
+        //                 // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
+        //                 else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+        //                     taxClass = '3';
+        //                 }
+        //                 // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
+        //                 else if (causeForCorrection.startsWith("03")) {
+        //                     taxClass = '4';
+        //                 }
+        //                 else {
+        //                     taxClass = '';
+        //                 }
 
-    //                 // 課税区分を配列に追加格納する
-    //                 dependentTaxpayerSet[index] = {
-    //                     ...dependentTaxpayerSet[index],
-    //                     扶養者課税区分: taxClass
-    //                 };
-    //             }
-    //         });
-    //     });
+        //                 // 課税区分を配列に追加格納する
+        //                 dependentTaxpayerSet[index] = {
+        //                     ...dependentTaxpayerSet[index],
+        //                     扶養者課税区分: taxClass
+        //                 };
+        //             }
+        //         });
+        //     });
 
         const headerMap = parsedCSVs[1].header.reduce((map, header, index) => {
             map[header] = index;
             return map;
         }, {});
-        
-        dependentTaxpayerSet.forEach((dependentTaxpayer, index) => {
+
+        for (let index = 0; index < dependentTaxpayerSet.length; index++) {
+            const dependentTaxpayer = dependentTaxpayerSet[index];
             // 宛名番号が一致する行をフィルタリング
-            const targetRows = parsedCSVs[1].rows.filter(row => 
+            const targetRows = parsedCSVs[1].rows.filter(row =>
                 row[headerMap['宛名番号']] === dependentTaxpayer['扶養者宛名番号']
             );
-        
-            targetRows.forEach(row => {
+
+            for (let i = 0; i < targetRows.length; i++) {
+                const row = targetRows[i];
                 const causeForCorrection = String(row[headerMap['更正事由']]); // 更正事由
                 const incomePercentage = Number(row[headerMap['所得割額']]); // 所得割額
                 const equalPercentage = Number(row[headerMap['均等割額']]); // 均等割額
                 let taxClass; // 最終的に配列に格納する課税区分
-        
+
                 // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
                 if (incomePercentage === 0 && equalPercentage === 0 && !causeForCorrection.startsWith("03")) {
                     taxClass = '1';
@@ -2252,25 +2254,28 @@ function additionalExclusion() {
                 else {
                     taxClass = '';
                 }
-        
+
                 // 課税区分を配列に追加格納する
                 dependentTaxpayerSet[index] = {
                     ...dependentTaxpayerSet[index],
                     扶養者課税区分: taxClass
                 };
-            });
-        });
-        
+            }
+        }
+
+
         // dependentTaxpayerSet内、「扶養者課税区分」が「2（＝均等割のみ課税）」もしくは「3（＝課税）」であるデータのみ抽出する（後続処理をわかりやすくするため）
         const filteredDependentTaxpayerSet = dependentTaxpayerSet.filter(dependentTaxpayer => dependentTaxpayer['扶養者課税区分'] === '2' || dependentTaxpayer['扶養者課税区分'] === '3');
 
         // 抽出したデータごとに後続処理を実施する
-        filteredDependentTaxpayerSet.forEach(filtereddependentTaxpayer => {
+        for (let i = 0; i < filteredDependentTaxpayerSet.length; i++) {
+            const filtereddependentTaxpayer = filteredDependentTaxpayerSet[i];
             // 検索ヒットした住民の扶養者宛名番号カラムの値をいれるための配列（後続処理で判定用として使用する配列）を定義する
             const relatedAddressNums = [];
 
             // map（中間ファイル＋税情報マスタ＋個人基本マスタ）内「世帯番号」が、filteredDependentTaxpayerSetの「世帯番号」と一致するものを検索し、ヒットした全行の「扶養者宛名番号」を配列に格納する
-            map.forEach((value, key) => {
+            for (let j = 0; j < map.size; j++) {
+                const [key, value] = Array.from(map.entries())[j];
                 if (value['世帯番号'] === filtereddependentTaxpayer['世帯番号']) {
                     // 扶養者宛名番号として「夫婦関連者宛名番号」「扶養関連者宛名番号」「専従関連者宛名番号」の種類があるため、filteredDependentTaxpayerSet内の「扶養形式」によって取得するカラムを判定する
                     // 扶養形式が「控配」もしくは「配偶者」の場合、「夫婦関連者宛名番号」を取得する（扶養者宛名番号が無い場合もあるため、その場合は空文字列を追加する）
@@ -2286,7 +2291,7 @@ function additionalExclusion() {
                         relatedAddressNums.push(value['専従関連者宛名番号'] || '');
                     }
                 }
-            });
+            }
 
             // 取得した扶養者宛名番号配列の中に、filteredDependentTaxpayerSetの「扶養者宛名番号」と一致しないものがあるか判定する
             const allMatchJudge = relatedAddressNums.every(addressNum => addressNum === filtereddependentTaxpayer['扶養者宛名番号']);
@@ -2294,18 +2299,18 @@ function additionalExclusion() {
             if (allMatchJudge) {
                 // 削除対象のキーを収集する配列を定義
                 const keysToDelete = [];
-                
+
                 // 削除対象のキーを収集
                 map.forEach((value, key) => {
                     if (value['世帯番号'] === filtereddependentTaxpayer['世帯番号']) {
                         keysToDelete.push(key);
                     }
                 });
-        
+
                 // 収集したキーを使ってmapからエントリーを削除
                 keysToDelete.forEach(key => map.delete(key));
             }
-        });
+        }
 
         map.forEach(value => {
             const row = fullHeader.map(header => value[header] || '');
