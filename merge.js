@@ -2696,7 +2696,7 @@ function generateFilesforPushTargetImport() {
             // 日付比較用に、生年月日カラムの値をdate型にする
             const birthDate= parseDate(line[columnIndices[3]]);
             // 日付比較用に、H18(2006).4.2をdate型にする
-            const targetDate = new Date('2006-04-02');
+            const targetDate = new Date('2006-04-02 00:00:00');
             // 多子加算判定を実施する（世帯主（続柄１が「02」）ではないかつ、生年月日がH18(2006).4.2以降である場合に多子加算対象者とする）
             if (line[columnIndices[10]] !== '02' &&  birthDate >= targetDate) {
                 semiChildAmountFlg = '1';
