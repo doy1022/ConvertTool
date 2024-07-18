@@ -1870,20 +1870,6 @@ function generateInquiryFiles() {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* 追加対応1. 賦課マスタと番号連携結果（税情報）ファイルをマージし、税情報マスタファイルを作成する処理*/
 function mergeTaxInfoFiles() {
     const fileIds = ['file34', 'file35'];
@@ -2312,28 +2298,6 @@ function additionalExclusion() {
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* 9.中間ファイル⑥と公金口座照会結果ファイルをマージする処理 */
 function mergePublicFundAccountInfo() {
     const fileIds = ['file22', 'file23'];
@@ -2669,7 +2633,8 @@ function generateFilesforPushTargetImport() {
             '専従主_市減免後均等割額',
             '専従主_県減免後均等割額',
             '生活扶助認定年月日',
-            '生活扶助廃止年月日'
+            '生活扶助廃止年月日',
+            '多子加算対象者フラグ'
         ];
 
         // 出力用の行を格納するリストを定義する
@@ -2726,6 +2691,19 @@ function generateFilesforPushTargetImport() {
                 relationshipErrorAddressNums.push(line[columnIndices[0]]);
             }
 
+            // 多子加算対象住民に対してフラグを立てる（デフォルト値は「0（多子加算非対象）」を設定する）
+            let semiChildAmountFlg = '0';
+            // 日付比較用に、生年月日カラムの値をdate型にする
+            const birthDate= parseDate(line[columnIndices[3]]);
+            // 日付比較用に、H18(2006).4.2をdate型にする
+            const targetDate = new Date('2006-04-02');
+            // 多子加算判定を実施する（世帯主（続柄１が「02」）ではないかつ、生年月日がH18(2006).4.2以降である場合に多子加算対象者とする）
+            if (line[columnIndices[10]] !== '02' &&  birthDate >= targetDate) {
+                semiChildAmountFlg = '1';
+            }
+            // 定数として定義しなおす
+            const childAmountFlg = semiChildAmountFlg
+
             return [
                 // 以下、テンプレートのカラム  
                 line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号（15桁に変換する）
@@ -2770,7 +2748,8 @@ function generateFilesforPushTargetImport() {
                 '', // 専従主_市減免後均等割額
                 '', // 専従主_県減免後均等割額
                 '', // 生活扶助認定年月日
-                '' // 生活扶助廃止年月日
+                '', // 生活扶助廃止年月日
+                childAmountFlg // 多子加算対象者フラグ
             ];
         }
 
