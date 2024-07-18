@@ -2521,7 +2521,8 @@ function generateFilesforPushTargetImport() {
                 '口座番号',
                 '店番',
                 '金融機関コード',
-                '預貯金種目コード'
+                '預貯金種目コード',
+                '外国人氏名優先区分' // 通称名の使用有無を判定するために必要となる
             ];
             const columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
@@ -2679,13 +2680,13 @@ function generateFilesforPushTargetImport() {
             // 定数として定義しなおす
             const processedAddressNum = semiProcessedAddressNum
 
-            // 性別コードを変換し、エラーがあればエラー出力用リストに追加する
+            // 性別コードを変換し、エラーがあればエラー出力用リストに対象の宛名番号を追加する
             let genderCode = convertGenderCode(line[columnIndices[4]]);
             if (genderCode === '') {
                 genderErrorAddressNums.push(line[columnIndices[0]]);
             }
 
-            // 続柄コードを変換し、エラーがあればエラー出力用リストに追加する
+            // 続柄コードを変換し、エラーがあればエラー出力用リストに対象の宛名番号を追加する
             let relationshipCode = convertRelationshipCode(line[columnIndices[10]], line[columnIndices[11]], line[columnIndices[12]], line[columnIndices[13]]);
             if (relationshipCode === '') {
                 relationshipErrorAddressNums.push(line[columnIndices[0]]);
@@ -2704,11 +2705,23 @@ function generateFilesforPushTargetImport() {
             // 定数として定義しなおす
             const childAmountFlg = semiChildAmountFlg
 
+            // 通称名の使用有無を判断する処理（「外国人氏名優先区分」カラムに「3」が入力されている場合、通称名を入力する。デフォルト値は空）
+            let semiNickname = '';
+            let semiNicknameKana = '';
+            // 通称名の使用有無を判断する（「外国人氏名優先区分」カラムに「3」が入力されている場合、通称名を設定する）
+            if (line[columnIndices[22]] == '3') {
+                semiNickname = line[columnIndices[14]]; // 住基内「外国人通称名」カラムの値を入力
+                semiNicknameKana = line[columnIndices[15]]; // 住基内「外国人カナ通称名」カラムの値を入力
+            }
+            // 定数として定義しなおす
+            const nickname = semiNickname;
+            const nicknameKana = semiNicknameKana;
+
             return [
                 // 以下、テンプレートのカラム  
                 line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号（15桁に変換する）
                 processedAddressNum, // 受給者宛名番号（世帯主の場合は空、他世帯員の場合は世帯主の宛名番号を15桁に変換した番号を設定する）
-                line[columnIndices[1] || columnIndices[13]], // 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
+                line[columnIndices[1] || columnIndices[16]], // 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
                 line[columnIndices[2]], // カナ氏名
                 separateDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
                 genderCode, // 性別
@@ -2723,8 +2736,8 @@ function generateFilesforPushTargetImport() {
                 '', // 世帯主宛名番号（世帯主行は空にする）
                 relationshipCode, // 続柄
                 '1', // 郵送対象者フラグ（郵送対象者のため「1」を設定）
-                line[columnIndices[14]], // 外国人通称名
-                line[columnIndices[15]], // 外国人カナ通称名
+                nickname, // 外国人通称名
+                nicknameKana, // 外国人カナ通称名
                 '非課税均等割確認書', // フォーマット種別（固定値）
                 'R6S1SBS', // 課税区分（固定値）
                 '', // 住民カスタム属性（空）
