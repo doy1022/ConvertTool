@@ -2727,7 +2727,7 @@ function generateFilesforPushTargetImport() {
 
             // インプット内「課税区分」の値を参照し、日本語化した文字列（「非課税対象」「均等割対象」）を、アウトプットの「住民カスタム属性」に出力する処理
             const inputTaxClass = String(line[columnIndices[23]]); // 判定で数回使用するため、定数として定義しておく
-            let outputTaxClass;
+            let outputTaxClass = ''; // 出力用の変数を定義する
             
             // インプットファイル内「名義人氏名」カラムに値が入力されている（＝プッシュ対象世帯の世帯主である）場合のみ、課税区分を判定する処理を行う
             if (line[columnIndices[17]]) {
