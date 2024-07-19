@@ -1783,7 +1783,8 @@ function generateInquiryFiles() {
                 '転入元都道府県市区町村コード',
                 '異動事由コード',
                 '住民票コード',
-                '続柄１'
+                '続柄１',
+                '住民日' // 住民日がR6.1.1よりあとの住民を抽出するため必要
             ];
             const columnIndices = requiredColumns.map(col => header.indexOf(col));
             // 足りないカラムをチェック
@@ -1849,24 +1850,28 @@ function generateInquiryFiles() {
     *  課税区分が空 かつ 前住所コードが「99999」でない行を抽出し、ファイル形式を整える
     */
     function filterPreviousPrefectCode(columnIndices, rows) {
+        // 日付比較で使用する日付を定義する
+        const targetDate = new Date('2024-01-01 00:00:00');
+
         // 条件に合致するレコードのみをフィルタする
         const filteredLines = rows.filter(line => {
-            const [taxClassification, previousAddressCode] = [
+            const [taxClassification, previousAddressCode, residentDate] = [
                 line[columnIndices[2]],
-                line[columnIndices[3]]
+                line[columnIndices[3]],
+                parseDate(line[columnIndices[7]]) // 日付比較のため、住民日をDate型に変換する
             ];
-            // 課税区分が空でない、もしくは「未申告（=4）でない行 または ②前住所コードが「99999」でない行を抽出する
-            return (taxClassification == '' && previousAddressCode !== '99999');
+            // 課税区分が空かつ、前住所コードが「99999」でないかつ、住民日がR6.1.1よりあとである行を抽出する
+            return (taxClassification == '' && previousAddressCode !== '99999' && residentDate > targetDate);
         });
 
         // フィルタリングされた行から、宛名番号列と住民票コード列のみを抽出する
         const selectedLines = filteredLines.map(line => [
-            line[columnIndices[0]],  // 宛名番号列
-            line[columnIndices[5]]   // 住民票コード列
+            line[columnIndices[5]].slice(-11), // 住民票コード列（左側0埋め4桁を除去する）
+            line[columnIndices[0]]  // 宛名番号列
         ]);
 
         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return [['宛名番号', '住民票コード'].join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
+        return [['住民票コード', '宛名番号'].join(','), ...selectedLines.map(line => line.join(','))].join('\r\n') + '\r\n';
     }
 }
 
