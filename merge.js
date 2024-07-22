@@ -2751,7 +2751,7 @@ function generateFilesforPushTargetImport() {
                 // 以下、テンプレートのカラム  
                 line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号（15桁に変換する）
                 processedAddressNum, // 受給者宛名番号（世帯主の場合は空、他世帯員の場合は世帯主の宛名番号を15桁に変換した番号を設定する）
-                line[columnIndices[1] || columnIndices[16]], // 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
+                line[columnIndices[1]] || line[columnIndices[16]],// 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
                 line[columnIndices[2]], // カナ氏名
                 separateDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
                 genderCode, // 性別
