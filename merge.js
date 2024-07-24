@@ -2923,6 +2923,108 @@ function generateFilesforPushTargetImport() {
     }
 }
 
+/* 11.「国内住登無し」ファイル内宛名番号カラムをキーとし、中間ファイル⑧内の該当住民の課税区分を「4（未申告）」に更新する処理 */
+function mergeNoDomesticAddressRegistration() {
+    const fileIds = ['file25', 'file26'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル⑧」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル⑧')) {
+        alert('アップロードするファイル名を「中間ファイル⑧」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル⑧」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 11 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    // 国内住登無しファイルの宛名番号をキーに、中間ファイル⑧の課税区分を更新する処理
+                    const updateTaxInfo = updateTaxByNoDomesticAddressRegistration(results[0], results[1]);
+                    // CSVダウンロード処理
+                    downloadCSV(updateTaxInfo, MIDDLE_FILE_9);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 11 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+
+    function updateTaxByNoDomesticAddressRegistration(csvText1, csvText2) {
+        // CSVテキストを行ごとに分割して配列に変換
+        const arrayFromMidFile = parseCSV(csvText1);
+        const arrayFromNoDomesticAddressFile = parseCSV(csvText2);
+
+        // 中間ファイルのヘッダー行を取得
+        const midFileHeader = arrayFromMidFile.header;
+        // 国内住登無しファイルのヘッダー行を取得
+        const NoDomesticAddressFileheader = arrayFromNoDomesticAddressFile.header;
+
+        // 必要な列のインデックスを取得
+        const addressNumIndex1 = midFileHeader.indexOf('宛名番号'); // 中間ファイル⑤の宛名番号のインデックスを取得
+        const taxClassIndex = midFileHeader.indexOf('課税区分'); // 中間ファイル⑤の課税区分のインデックスを取得
+        const addressNumIndex2 = NoDomesticAddressFileheader.indexOf('宛名番号'); // 国内住登無しファイルの宛名番号のインデックスを取得
+
+        // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
+        const missingColumns = [];
+        if (addressNumIndex1 === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (taxClassIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：課税区分');
+        }
+        if (addressNumIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：宛名番号');
+        }
+
+        if (missingColumns.length > 0) {
+            throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
+        }
+
+        // 国内住登無し住民の宛名番号セットを作成する
+        const addressNumSet = new Set(arrayFromNoDomesticAddressFile.rows
+            // 国内住登無し住民ファイルの宛名番号は頭の0埋めが無い為、左側0埋めの10桁に変換してから格納する
+            .map(line => line[addressNumIndex2].padStart(10, '0').trim())
+        );
+
+        // 国内住登無し住民の宛名番号セットをキーにして、中間ファイルの該当行の課税区分を4に更新する
+        const updatedRows = arrayFromMidFile.rows.filter(line => {
+            const addressNum = line[addressNumIndex1].trim();
+            // 中間ファイルの宛名番号が国内住登無し住民の宛名番号セットに含まれている場合、課税区分を4に更新する
+            if (addressNumSet.has(addressNum)) {
+                line[taxClassIndex] = '4';
+            }
+            return true;
+        });
+
+        // ヘッダー・更新が入った状態の中間ファイルの全行を結合しCSV形式に戻す
+        return formatOutputFile(midFileHeader, updatedRows, NEWLINE_CHAR_CRLF);
+    }
+}
+
 /* 12. 旧宛名番号に紐づく税情報を取得し、現宛名番号に紐づけ課税区分判定を行う処理*/
 function determineTaxClassfromOldAddressNum() {
     // 各ファイルのIDを配列に格納する
