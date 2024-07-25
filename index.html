@@ -141,12 +141,12 @@
                     <input type="file" id="file37" accept=".csv"><br><br>
                     <label for="file38">個人基本マスタをアップロードしてください:</label>
                     <input type="file" id="file38" accept=".csv"><br><br>
-                    <button type="button" onclick="additionalExclusion()">中間ファイル⑥-追加対応済みを作成する</button>
+                    <button type="button" onclick="additionalExclusion()">中間ファイル⑥_追加対応済みを作成する</button>
                 </form>
 
                 <h1>9.中間ファイル⑥と公金口座照会結果ファイルをマージする</h1>
                 <form id="csvForm16">
-                    <label for="file22">中間ファイル⑥-追加対応済みをアップロードしてください:</label>
+                    <label for="file22">中間ファイル⑥_追加対応済みをアップロードしてください:</label>
                     <input type="file" id="file22" accept=".csv"><br><br>
                     <label for="file23">番号連携照会結果（公金受取口座情報）ファイルをアップロードしてください:</label>
                     <input type="file" id="file23" accept=".DAT"><br><br>
@@ -195,6 +195,24 @@
                 </form>
             </div>
             <div class="tabcontent" id="tabcontent5">
+                <h1>追加対応3.番号連携照会結果（税情報）にてエラーであった住民の課税区分をマージする</h1>
+                <form id="csvForm25">
+                    <label for="file39">中間ファイル⑩をアップロードしてください:</label>
+                    <input type="file" id="file39" accept=".csv"><br><br>
+                    <label for="file40">「番号連携エラー住民のうち、照会が完了している住民一覧」ファイルをアップロードしてください:</label>
+                    <input type="file" id="file40" accept=".csv"><br><br>
+                    <button type="button" onclick="updateTaxInfoByNumLinkageErrorResidentsFile()">中間ファイル⑩_番号連携エラー取込み済み を作成する</button>
+                </form>
+
+                <h1>追加対応4.中間ファイルの「所得割額」の値を「金額予備１０」の値で更新する</h1>
+                <form id="csvForm24">
+                    <label for="file41">中間ファイル⑩をアップロードしてください:</label>
+                    <input type="file" id="file41" accept=".csv"><br><br>
+                    <label for="file42">税情報マスタをアップロードしてください:</label>
+                    <input type="file" id="file42" accept=".csv"><br><br>
+                    <button type="button" onclick="additionalExclusion()">中間ファイル⑩_「金額予備１０」対応済み を作成する</button>
+                </form>
+
                 <h1>14.番号連携照会結果（税情報）ファイルから課税区分を判別し、中間ファイルを更新する</h1>
                 <form id="csvForm21">
                     <label for="file31">中間ファイル⑩をアップロードしてください:</label>
