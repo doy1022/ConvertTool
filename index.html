@@ -222,16 +222,17 @@
                     <button type="button" onclick="updateTaxInfoByReInquiryResult()">中間ファイル⑪を作成する</button>
                 </form>
 
-                <h1>15.下記の3ファイルを作成する</h1>
+                <h1>15.下記の4ファイルを作成する</h1>
                 <ul>
                     <li>ServiceNowにインポートする「給付対象者ファイル」</li>
+                    <li>ServiceNowにインポートする「直接振込対象者ファイル」</li>
                     <li>税情報不明住民リスト</li>
                     <li>中間ファイル⑫</li>
                 </ul>
                 <form id="csvForm22">
                     <label for="file33">中間ファイル⑪をアップロードしてください:</label>
                     <input type="file" id="file33" accept=".csv"><br><br>
-                    <button type="button" onclick="generateFilesforPushTargetImport()">上記3ファイルを作成する</button>
+                    <button type="button" onclick="generateFilesforConfirmationTargetImport()">上記4ファイルを作成する</button>
                 </form>
             </div>
         </div>
