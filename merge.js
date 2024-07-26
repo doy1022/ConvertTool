@@ -3193,19 +3193,19 @@ function updateTaxInfoByNumLinkageErrorResidentsFile() {
             if (taxMap.hasOwnProperty(addressNumFromMidFile)) {
                 const taxClass = taxMap[addressNumFromMidFile];
 
-                // 帰化対象者税情報照会ファイルの税区分が「非課税」である住民を非課税(1)判定として中間ファイル⑩更新
+                // 番号連携エラー住民ファイルの税区分が「非課税」である住民を非課税(1)判定として中間ファイル⑩更新
                 if (taxClass === '非課税') {
                     midRow[taxClassIndex] = '1';
                 }
-                // 帰化対象者税情報照会ファイルの税区分が「均等割のみ課税」である住民を均等割のみ課税(2)判定として中間ファイル⑩更新
+                // 番号連携エラー住民ファイルの税区分が「均等割のみ課税」である住民を均等割のみ課税(2)判定として中間ファイル⑩更新
                 else if (taxClass === '均等割りのみ課税') {
                     midRow[taxClassIndex] = '2';
                 }
-                // 帰化対象者税情報照会ファイルの税区分が「課税」である住民を均等割のみ課税(3)判定として中間ファイル⑩更新
+                // 番号連携エラー住民ファイルの税区分が「課税」である住民を均等割のみ課税(3)判定として中間ファイル⑩更新
                 else if (taxClass === '課税') {
                     midRow[taxClassIndex] = '3';
                 }
-                // 帰化対象者税情報照会ファイルの税区分が「未申告」である住民を未申告(4)判定として中間ファイル⑩更新
+                // 番号連携エラー住民ファイルの税区分が「未申告」である住民を未申告(4)判定として中間ファイル⑩更新
                 else if (taxClass === '未申告') {
                     midRow[taxClassIndex] = '4';
                 }
