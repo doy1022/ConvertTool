@@ -14,6 +14,7 @@ const MIDDLE_FILE_9 = "中間ファイル⑨.csv";
 const MIDDLE_FILE_10 = "中間ファイル⑩.csv";
 const MIDDLE_FILE_10_UPDATED_TAX_INFO = "中間ファイル⑩_番号連携エラー取込み済み.csv";
 const MIDDLE_FILE_11 = "中間ファイル⑪.csv";
+const MIDDLE_FILE_12 = "中間ファイル⑫.csv";
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
 const RESIDENTINFO_INQUIRY_FILE_2 = "住基照会用ファイル②.csv";
 const NATURALIZED_CITIZEN_FILE = '帰化対象者.csv';
@@ -23,6 +24,57 @@ const PUBLIC_ACCOUNT_FILE = '新たな給付_公金受取口座情報.csv';
 const TAX_INFO_MASTER = '税情報マスタ.csv';
 const NUMBER_OF_DATA_DIVISION = 10000; // 税情報データ分割数
 const NEWLINE_CHAR_CRLF = '\r\n'; // 改行コード：CRLF
+const beneficiaryFileHeader = [
+    '宛名番号',
+    '受給者宛名番号',
+    '氏名',
+    '氏名フリガナ',
+    '生年月日',
+    '性別',
+    '電話番号',
+    '郵便番号',
+    '住所',
+    '方書',
+    '異動元郵便番号',
+    '異動元住所',
+    '異動元方書',
+    '世帯番号',
+    '世帯主宛名番号',
+    '続柄',
+    '郵送対象者フラグ',
+    '通称名',
+    '通称名カナ',
+    'フォーマット種別',
+    '課税区分',
+    '住民カスタム属性',
+    '転入日',
+    '賦課期日居住者フラグ',
+    '照会対象フラグ',
+    '賦課無フラグ',
+    '課税保留フラグ',
+    '租税条約免除フラグ',
+    '生活扶助非課税フラグ',
+    '対象者_課税フラグ',
+    '対象者_市減免後均等割額',
+    '対象者_県減免後均等割額',
+    '扶養主_宛名番号',
+    '扶養主_課税フラグ',
+    '扶養主_市免除後均等割額',
+    '扶養主_県免除後均等割額',
+    '専従主_宛名番号',
+    '専従主_課税フラグ',
+    '専従主_市減免後均等割額',
+    '専従主_県減免後均等割額',
+    '生活扶助認定年月日',
+    '生活扶助廃止年月日',
+    '多子加算対象者フラグ'
+]; // SNにインポートする「給付対象者ファイル」のヘッダー
+const pushTargetFileHeader = [
+    '宛名番号',
+    '直接振込対象者フラグ',
+    '課税区分キー',
+]; // SNにインポートする「直接振込対象者ファイル」のヘッダー
+
 
 // todo カラム不備のエラハン
 /* 0.課税区分を判定するために賦課マスタ・個人基本マスタをマージする処理 */
@@ -2439,53 +2491,6 @@ function generateFilesforPushTargetImport() {
     *  口座情報が存在する住民が所属する世帯の世帯員全員を抽出し、ファイル形式を整える処理
     */
     function generateBeneficiaryfile(columnIndices, rows) {
-        // 出力用のヘッダーを定義する
-        const outputHeader = [
-            '宛名番号',
-            '受給者宛名番号',
-            '氏名',
-            '氏名フリガナ',
-            '生年月日',
-            '性別',
-            '電話番号',
-            '郵便番号',
-            '住所',
-            '方書',
-            '異動元郵便番号',
-            '異動元住所',
-            '異動元方書',
-            '世帯番号',
-            '世帯主宛名番号',
-            '続柄',
-            '郵送対象者フラグ',
-            '通称名',
-            '通称名カナ',
-            'フォーマット種別',
-            '課税区分',
-            '住民カスタム属性',
-            '転入日',
-            '賦課期日居住者フラグ',
-            '照会対象フラグ',
-            '賦課無フラグ',
-            '課税保留フラグ',
-            '租税条約免除フラグ',
-            '生活扶助非課税フラグ',
-            '対象者_課税フラグ',
-            '対象者_市減免後均等割額',
-            '対象者_県減免後均等割額',
-            '扶養主_宛名番号',
-            '扶養主_課税フラグ',
-            '扶養主_市免除後均等割額',
-            '扶養主_県免除後均等割額',
-            '専従主_宛名番号',
-            '専従主_課税フラグ',
-            '専従主_市減免後均等割額',
-            '専従主_県減免後均等割額',
-            '生活扶助認定年月日',
-            '生活扶助廃止年月日',
-            '多子加算対象者フラグ'
-        ];
-
         // 出力用の行を格納するリストを定義する
         const outputLines = [];
         // 性別カラムの変換時、中間ファイル⑦内の性別コードが「1」「2」の場合にエラーを出力するため、エラー出力用のリストを定義する
@@ -2654,20 +2659,13 @@ function generateFilesforPushTargetImport() {
         }
 
         // 出力用リストをカンマで結合し、改行で区切られた文字列に変換
-        return formatOutputFile(outputHeader, outputLines, NEWLINE_CHAR_CRLF);
+        return formatOutputFile(beneficiaryFileHeader, outputLines, NEWLINE_CHAR_CRLF);
     }
 
     /**
     * 直接振込対象者ファイル（フラグ用ファイル）を作成する処理。対象世帯の世帯主、および世帯員全員「直接振込対象者フラグ」カラムに「1（＝直接振込対象者として設定する）」を設定する
     */
     function generatePushTargetfile(columnIndices, rows) {
-        // 出力用のヘッダーを定義する
-        const outputHeader = [
-            '宛名番号',
-            '直接振込対象者フラグ',
-            '課税区分キー',
-        ];
-
         // 出力用の行を格納するリストを定義する
         const outputLines = [];
 
@@ -2697,7 +2695,7 @@ function generateFilesforPushTargetImport() {
         });
 
         // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return formatOutputFile(outputHeader, outputLines, NEWLINE_CHAR_CRLF);
+        return formatOutputFile(pushTargetFileHeader, outputLines, NEWLINE_CHAR_CRLF);
     }
 
     /**
@@ -3080,55 +3078,6 @@ function generateTaxInfoReferenceFile() {
     reader.readAsText(files[0]);
 }
 
-/* 14.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルの値によって課税/非課税/均等割の更新をかける処理 */
-function updateTaxInfoByReInquiryResult() {
-    const fileIds = ['file31', 'file32'];
-    const { check, file_num, files } = fileCheck(fileIds);
-    if (!check) {
-        return; // ファイル数が足りない場合は処理を終了
-    }
-
-    // 各ファイルのファイル形式をチェック
-    const extensionCheck = fileExtensionCheck(files, true);
-    if (!extensionCheck) {
-        return; // ファイル名が「.csv」もしくは「.DAT」で終わらない場合はエラーを出して処理終了
-    }
-
-    // 「中間ファイル④」がインプットされたことを確認する（前方一致で確認）
-    if (!files[0].name.startsWith('中間ファイル⑩')) {
-        alert('アップロードするファイル名を「中間ファイル⑩」から始まるものにして下さい。');
-        return; // ファイル名が「中間ファイル⑩」で始まらない場合はエラーを出して処理終了
-    }
-
-    // 処理開始log
-    logger.info('STEP 14 処理を開始しました');
-
-    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
-    const readers = files.map(file => new FileReader());
-    const results = [];
-
-    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
-    readers.forEach((reader, index) => {
-        reader.onload = function (e) {
-            results[index] = e.target.result;
-
-            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
-            if (results.filter(result => result).length === file_num) {
-                try {
-                    const updateTaxInfo = updateTaxInfoByTaxesNumLinkageFile(results[0], results[1]);
-                    downloadCSV(updateTaxInfo, MIDDLE_FILE_11);
-                } catch (error) {
-                    // catchしたエラーを表示
-                    logger.error(error);
-                } finally {
-                    logger.info('STEP 14 処理を終了しました');
-                }
-            }
-        };
-        reader.readAsText(files[index]);
-    });
-}
-
 /* 追加対応3.番号連携照会結果（税情報）にてエラーであった住民の課税区分をマージする処理 */
 function updateTaxInfoByNumLinkageErrorResidentsFile() {
     const fileIds = ['file39', 'file40'];
@@ -3283,6 +3232,58 @@ function updateTaxInfoByNumLinkageErrorResidentsFile() {
         //return [midFileHeader, ...arrayFromMidFile.rows].map(line => line.join(',')).join('\r\n') + '\r\n';
     }
 }
+
+/* 14.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルの値によって課税/非課税/均等割の更新をかける処理 */
+function updateTaxInfoByReInquiryResult() {
+    const fileIds = ['file31', 'file32'];
+    const { check, file_num, files } = fileCheck(fileIds);
+    if (!check) {
+        return; // ファイル数が足りない場合は処理を終了
+    }
+
+    // 各ファイルのファイル形式をチェック
+    const extensionCheck = fileExtensionCheck(files, true);
+    if (!extensionCheck) {
+        return; // ファイル名が「.csv」もしくは「.DAT」で終わらない場合はエラーを出して処理終了
+    }
+
+    // 「中間ファイル④」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル⑩')) {
+        alert('アップロードするファイル名を「中間ファイル⑩」から始まるものにして下さい。');
+        return; // ファイル名が「中間ファイル⑩」で始まらない場合はエラーを出して処理終了
+    }
+
+    // 処理開始log
+    logger.info('STEP 14 処理を開始しました');
+
+    // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+    const readers = files.map(file => new FileReader());
+    const results = [];
+
+    // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+    readers.forEach((reader, index) => {
+        reader.onload = function (e) {
+            results[index] = e.target.result;
+
+            // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+            if (results.filter(result => result).length === file_num) {
+                try {
+                    const updateTaxInfo = updateTaxInfoByTaxesNumLinkageFile(results[0], results[1]);
+                    downloadCSV(updateTaxInfo, MIDDLE_FILE_11);
+                } catch (error) {
+                    // catchしたエラーを表示
+                    logger.error(error);
+                } finally {
+                    logger.info('STEP 14 処理を終了しました');
+                }
+            }
+        };
+        reader.readAsText(files[index]);
+    });
+}
+
+/* 15.ServiceNowにインポートする「給付対象者ファイル」「直接振込対象者ファイル」、確認書対象者を除外した「中間ファイル⑫」を作成する処理 */
+
 
 /* 以下、使いまわすメソッド（汎用処理）ここから */
 
