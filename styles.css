@@ -28,6 +28,11 @@
     border-radius: 5px;
 }
 
+h1 {
+    color: #1b85db;
+    font-size: 1.5rem;
+}
+
 body {
     font-family: "Helvetica Neue",
       Arial,
@@ -106,7 +111,7 @@ input:checked + .tab {
     padding: 1em;
     position: relative;
     z-index: 0;
-    background-color: #fff;
+    background-color: #fafafa;
     border-radius: 0 0 0.5em 0.5em;
     animation: fadeIn 0.5s;
 }
