@@ -13,6 +13,7 @@ const MIDDLE_FILE_8 = "中間ファイル⑧.csv";
 const MIDDLE_FILE_9 = "中間ファイル⑨.csv";
 const MIDDLE_FILE_10 = "中間ファイル⑩.csv";
 const MIDDLE_FILE_10_UPDATED_TAX_INFO = "中間ファイル⑩_番号連携エラー取込み済み.csv";
+const MIDDLE_FILE_10_AMOUNT_PRELIMINARY_SUPPORTED = "中間ファイル⑩_「金額予備１０」対応済み.csv";
 const MIDDLE_FILE_11 = "中間ファイル⑪.csv";
 const MIDDLE_FILE_12 = "中間ファイル⑫.csv";
 const RESIDENTINFO_INQUIRY_FILE_1 = "住基照会用ファイル①.csv";
@@ -3183,28 +3184,28 @@ function updateTaxInfoByNumLinkageErrorResidentsFile() {
     }
 }
 
-/* 14.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルの値によって課税/非課税/均等割の更新をかける処理 */
-function updateTaxInfoByReInquiryResult() {
-    const fileIds = ['file31', 'file32'];
+/* 追加対応4.税情報マスタファイルを参照し、中間ファイルの「所得割額」の値を更新する処理（「金額予備１０」対応） */
+function amountReserveSupport() {
+    const fileIds = ['file41', 'file42'];
     const { check, file_num, files } = fileCheck(fileIds);
     if (!check) {
         return; // ファイル数が足りない場合は処理を終了
     }
 
     // 各ファイルのファイル形式をチェック
-    const extensionCheck = fileExtensionCheck(files, true);
+    const extensionCheck = fileExtensionCheck(files);
     if (!extensionCheck) {
-        return; // ファイル名が「.csv」もしくは「.DAT」で終わらない場合はエラーを出して処理終了
+        return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
-    // 「中間ファイル④」がインプットされたことを確認する（前方一致で確認）
+    // 「中間ファイル⑩」がインプットされたことを確認する（前方一致で確認）
     if (!files[0].name.startsWith('中間ファイル⑩')) {
         alert('アップロードするファイル名を「中間ファイル⑩」から始まるものにして下さい。');
         return; // ファイル名が「中間ファイル⑩」で始まらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
-    logger.info('STEP 14 処理を開始しました');
+    logger.info('追加対応STEP 4 処理を開始しました');
 
     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
     const readers = files.map(file => new FileReader());
@@ -3218,21 +3219,195 @@ function updateTaxInfoByReInquiryResult() {
             // results配列内のデータがすべてそろったかを確認し、後続処理を行う
             if (results.filter(result => result).length === file_num) {
                 try {
-                    const updateTaxInfo = updateTaxInfoByTaxesNumLinkageFile(results[0], results[1]);
-                    downloadCSV(updateTaxInfo, MIDDLE_FILE_11);
+                    // 税情報マスタの情報を基に、課税区分を更新する処理
+                    const updateTaxInfoText = updateTaxInfoFromAmountReserveColumn(results[0], results[1]);
+                    // 課税対象の住民を除外する処理
+                    const excludeTaxableText = filterTaxExcluded(updateTaxInfoText);
+                    // CSVダウンロード処理
+                    downloadCSV(excludeTaxableText, MIDDLE_FILE_10_AMOUNT_PRELIMINARY_SUPPORTED);
                 } catch (error) {
                     // catchしたエラーを表示
                     logger.error(error);
                 } finally {
-                    logger.info('STEP 14 処理を終了しました');
+                    logger.info('追加対応STEP 4 処理を終了しました');
                 }
             }
         };
         reader.readAsText(files[index]);
     });
+
+    function updateTaxInfoFromAmountReserveColumn(csvText1, csvText2) {
+        // CSVテキストを行ごとに分割して配列に変換する
+        const arrayFromMidFile = parseCSV(csvText1);
+        const arrayFromLevyMasterFile = parseCSV(csvText2);
+
+        // 各ファイルのヘッダー行を取得する
+        const midFileHeader = arrayFromMidFile.header;
+        const LevyMasterheader = arrayFromLevyMasterFile.header;
+
+        // 必要な列のインデックスを取得する
+        const addressNumIndex1 = midFileHeader.indexOf('宛名番号'); // 中間ファイル⑩の宛名番号のインデックスを取得
+        const incomeBracketIndex = midFileHeader.indexOf('所得割額'); // 中間ファイル⑩の所得割額のインデックスを取得
+        const equalPercentageIndex = midFileHeader.indexOf('均等割額'); // 中間ファイル⑩の均等割額のインデックスを取得
+        const causeForCorrectionIndex = midFileHeader.indexOf('更正事由'); // 中間ファイル⑩の更正事由のインデックスを取得
+        const taxClassIndex = midFileHeader.indexOf('課税区分'); // 中間ファイル⑩の課税区分のインデックスを取得
+        const addressNumIndex2 = LevyMasterheader.indexOf('宛名番号'); // 税情報マスタの宛名番号のインデックスを取得
+        const incomeBracketIndex2 = LevyMasterheader.indexOf('所得割額'); // 税情報マスタの所得割額のインデックスを取得
+        const equalPercentageIndex2 = LevyMasterheader.indexOf('均等割額'); // 税情報マスタの均等割額のインデックスを取得
+        const amountPreliminaryIndex = LevyMasterheader.indexOf('金額予備１０'); // 税情報マスタの金額予備１０のインデックスを取得
+        
+        // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
+        const missingColumns = [];
+        if (addressNumIndex1 === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (incomeBracketIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：所得割額');
+        }
+        if (equalPercentageIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：均等割額');
+        }
+        if (causeForCorrectionIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：更正事由');
+        }
+        if (taxClassIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：課税区分');
+        }
+        if (addressNumIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (incomeBracketIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：所得割額');
+        }
+        if (equalPercentageIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：均等割額');
+        }
+        if (amountPreliminaryIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：金額予備１０');
+        }
+
+        if (missingColumns.length > 0) {
+            throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
+        }
+        
+        // 税情報マスタの宛名番号をキーにして、「所得割額」「均等割額」「金額予備１０」をマップに格納する処理
+        const taxMap = new Map();
+        arrayFromLevyMasterFile.rows.forEach(levyrow => {
+            // 税情報マスタの宛名番号を取得する（マップのキーとなる）
+            const addressNumFromLevyMasterFile = levyrow[addressNumIndex2] 
+            // 税情報マスタの「金額予備１０」を取得する。ここでnumber型に変換するが、空の場合Number型で取得すると0になるため、空の場合は空文字にする
+            const amountPreliminaryFromLevyMasterFile = levyrow[amountPreliminaryIndex] ? Number(levyrow[amountPreliminaryIndex]) : '';
+            // 「所得割額」「均等割額」も「金額予備１０」と同様に、number型に変換した値、もしくは空文字を取得する
+            const incomeBracketFromLevyMasterFile = levyrow[incomeBracketIndex2] ? Number(levyrow[incomeBracketIndex2]) : '';
+            const equalPercentageFromLevyMasterFile = levyrow[equalPercentageIndex2] ? Number(levyrow[equalPercentageIndex2]) : '';
+            // 宛名番号をキーにして、「所得割額」「均等割額」「金額予備１０」をマップに格納する
+            taxMap.set(addressNumFromLevyMasterFile, {incomeBracket: incomeBracketFromLevyMasterFile, equalPercentage: equalPercentageFromLevyMasterFile, amountPreliminary: amountPreliminaryFromLevyMasterFile});
+        });
+
+        // 中間ファイル⑩にて、宛名番号に対応する各税情報カラムを更新する処理
+        arrayFromMidFile.rows.forEach(midRow => {
+            const addressNumFromMidFile = midRow[addressNumIndex1]; // 中間ファイル⑩の宛名番号を取得する（カラムの更新有無の判定用）
+            const causeForCorrection = String(midRow[causeForCorrectionIndex]); // 中間ファイル⑩の更正事由を取得する（課税区分の判定用）
+
+            // 税情報マスタに宛名番号が存在する場合、後続処理を行う
+            if (taxMap.has(addressNumFromMidFile)) {
+                // 税情報マスタの各カラム値を取得する
+                const {incomeBracket, equalPercentage, amountPreliminary} = taxMap.get(addressNumFromMidFile);
+                // （共通の処理）中間ファイル⑩の「均等割額」カラムに税情報マスタの「均等割額」の値を入力する
+                midRow[equalPercentageIndex] = equalPercentage;
+            
+                // 「金額予備１０」の値が空でない場合、「金額予備１０」の値を中間ファイル⑩の「所得割額」カラムに入力する
+                if (amountPreliminary !== '') {
+                    midRow[incomeBracketIndex] = amountPreliminary;
+                }
+                // 「金額予備１０」の値が空の場合、「所得割額」の値を中間ファイル⑩の「所得割額」カラムに入力する
+                else if (amountPreliminary == '') {
+                    midRow[incomeBracketIndex] = incomeBracket;
+                }
+
+                // 更新した「所得割額」カラム、「均等割額」カラムの値を基に、課税区分を再度判定し、更新する
+                // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
+                if (midRow[incomeBracketIndex] == 0 && midRow[equalPercentageIndex] == 0 && !causeForCorrection.startsWith("03")) {
+                    midRow[taxClassIndex] = '1';
+                }
+                // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+                else if (midRow[incomeBracketIndex] == 0 && midRow[equalPercentageIndex] > 0 && !causeForCorrection.startsWith("03")) {
+                    midRow[taxClassIndex] = '2';
+                } 
+                // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
+                else if (midRow[incomeBracketIndex] > 0 && midRow[equalPercentageIndex] > 0 && !causeForCorrection.startsWith("03")) {
+                    midRow[taxClassIndex] = '3';
+                } 
+                // 「所得割額」が1以上のときは「均等割額」が1以上になるはずのため、「均等割額」が0のものはエラーとして投げる
+                else if (midRow[incomeBracketIndex] > 0 && midRow[equalPercentageIndex] == 0 && !causeForCorrection.startsWith("03")) {
+                    throw new Error('【宛名番号：' + addressNumFromMidFile + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
+                } 
+                // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定（念のため判定）
+                else if (causeForCorrection.startsWith("03")) {
+                    midRow[taxClassIndex] = '4';
+                } 
+                else {
+                    midRow[taxClassIndex] = '';
+                }
+            }
+        });
+
+        // フィルタリングされた行をCSV形式に戻す
+        return formatOutputFile(midFileHeader, arrayFromMidFile.rows, NEWLINE_CHAR_CRLF);
+    }
 }
 
-/* 15.ServiceNowにインポートする「給付対象者ファイル」「直接振込対象者ファイル」、確認書対象者を除外した「中間ファイル⑫」を作成する処理 */
+// /* 14.税情報無しの住民を含んだファイルに対し、番号連携照会結果（税情報）ファイルの値によって課税/非課税/均等割の更新をかける処理 */
+// /* 追加対応STEP4にて本STEPの内容を含むようにするため不要化。コメントアウトで論理削除します。 */
+// function updateTaxInfoByReInquiryResult() {
+//     const fileIds = ['file31', 'file32'];
+//     const { check, file_num, files } = fileCheck(fileIds);
+//     if (!check) {
+//         return; // ファイル数が足りない場合は処理を終了
+//     }
+
+//     // 各ファイルのファイル形式をチェック
+//     const extensionCheck = fileExtensionCheck(files, true);
+//     if (!extensionCheck) {
+//         return; // ファイル名が「.csv」もしくは「.DAT」で終わらない場合はエラーを出して処理終了
+//     }
+
+//     // 「中間ファイル④」がインプットされたことを確認する（前方一致で確認）
+//     if (!files[0].name.startsWith('中間ファイル⑩')) {
+//         alert('アップロードするファイル名を「中間ファイル⑩」から始まるものにして下さい。');
+//         return; // ファイル名が「中間ファイル⑩」で始まらない場合はエラーを出して処理終了
+//     }
+
+//     // 処理開始log
+//     logger.info('STEP 14 処理を開始しました');
+
+//     // map処理でファイル分のFileReaderオブジェクトを生成し、ファイルの読み込みを行う
+//     const readers = files.map(file => new FileReader());
+//     const results = [];
+
+//     // 各ファイルを順に読み込み、読み込みが完了したタイミングでonload処理が走る（onloadイベント）
+//     readers.forEach((reader, index) => {
+//         reader.onload = function (e) {
+//             results[index] = e.target.result;
+
+//             // results配列内のデータがすべてそろったかを確認し、後続処理を行う
+//             if (results.filter(result => result).length === file_num) {
+//                 try {
+//                     const updateTaxInfo = updateTaxInfoByTaxesNumLinkageFile(results[0], results[1]);
+//                     downloadCSV(updateTaxInfo, MIDDLE_FILE_11);
+//                 } catch (error) {
+//                     // catchしたエラーを表示
+//                     logger.error(error);
+//                 } finally {
+//                     logger.info('STEP 14 処理を終了しました');
+//                 }
+//             }
+//         };
+//         reader.readAsText(files[index]);
+//     });
+// }
+
+/* 14（旧15）.ServiceNowにインポートする「給付対象者ファイル」「直接振込対象者ファイル」、確認書対象者を除外した「中間ファイル⑫」を作成する処理 */
 function generateFilesforConfirmationTargetImport() {
     // 各ファイルのIDを配列に格納する
     const fileIds = ['file33'];
@@ -3247,14 +3422,14 @@ function generateFilesforConfirmationTargetImport() {
         return; // ファイル名が「.csv」で終わらない場合はエラーを出して処理終了
     }
 
-    // 「中間ファイル⑦」がインプットされたことを確認する（前方一致で確認）
-    if (!files[0].name.startsWith('中間ファイル⑪')) {
-        alert('アップロードするファイル名を「中間ファイル⑪」から始まるものにして下さい。');
+    // 「中間ファイル⑩」がインプットされたことを確認する（前方一致で確認）
+    if (!files[0].name.startsWith('中間ファイル⑩')) {
+        alert('アップロードするファイル名を「中間ファイル⑩」から始まるものにして下さい。');
         return; // ファイル名が「中間ファイル⑪」で始まらない場合はエラーを出して処理終了
     }
 
     // 処理開始log
-    logger.info('STEP 15 処理を開始しました');
+    logger.info('STEP 14 処理を開始しました');
     //showLoading();
 
     // 読み込んだデータをresults配列の対応する位置に保存する
@@ -3332,10 +3507,10 @@ function generateFilesforConfirmationTargetImport() {
                 noTaxInfoTextFlg = true;
             }
 
-            /* 中間ファイル⑫の作成処理 */
-            const Midfile12Text = generateMidfile12(columnIndices, header, rows);
-            if (!generateMidfile12) {
-                logger.warn('■ファイル名：' + MIDDLE_FILE_12 + ' >> 出力対象レコードが存在しませんでした。');
+            /* 中間ファイル⑪の作成処理 */
+            const Midfile11Text = generateMidfile11(columnIndices, header, rows);
+            if (!generateMidfile11) {
+                logger.warn('■ファイル名：' + MIDDLE_FILE_11 + ' >> 出力対象レコードが存在しませんでした。');
             } else {
                 midFileTextFlg = true;
             }
@@ -3351,13 +3526,13 @@ function generateFilesforConfirmationTargetImport() {
                 downloadCSV(noTaxInfoText, NO_TAX_INFO_FILE);
             }
             if (midFileTextFlg) {
-                downloadCSV(Midfile12Text, MIDDLE_FILE_12);
+                downloadCSV(Midfile11Text, MIDDLE_FILE_11);
             }
         } catch (error) {
             // catchしたエラーを表示
             logger.error(error);
         } finally {
-            logger.info('STEP 15 処理を終了しました');
+            logger.info('STEP 14 処理を終了しました');
             //hideLoading();
         }
     };
@@ -3385,9 +3560,9 @@ function generateFilesforConfirmationTargetImport() {
     }
 
     /**
-    * 確認書対象の住民行を除外し、中間ファイル⑫を作成する処理
+    * 確認書対象の住民行を除外し、中間ファイル⑪を作成する処理
     */
-    function generateMidfile12(columnIndices, header, rows) {
+    function generateMidfile11(columnIndices, header, rows) {
         // 除外対象の世帯番号の値を収集するためのセットを作成する
         const excludedHouseholdNumSet = new Set();
         // 除外条件となる課税区分の値を定義する
