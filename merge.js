@@ -2859,8 +2859,8 @@ function determineTaxClassfromOldAddressNum() {
             // results配列内のデータがすべてそろったかを確認し、後続処理を行う
             if (results.filter(result => result).length === file_num) {
                 try {
-                    // 読み込んだファイル内データのマージ処理
-                    const mergedCSV = mergeCSVwithOldAddressNum(...results);
+                    // 実際の課税区分更新処理
+                    const mergedCSV = mergeCSVwithOldAddressNum(results[0], results[1], results[2]);
                     // 課税対象の住民を除外する処理
                     const excludeTaxableText = filterTaxExcluded(mergedCSV);
                     // アウトプットファイルのダウンロード処理
@@ -2877,95 +2877,253 @@ function determineTaxClassfromOldAddressNum() {
         reader.readAsText(files[index]);
     });
 
-    function mergeCSVwithOldAddressNum(...csvFiles) {
+    function mergeCSVwithOldAddressNum(csvText1, csvText2, csvText3) {
         // 各CSVファイルをヘッダーとデータ行に分解し、配列に格納する
-        const parsedCSVs = csvFiles.map(csv => parseCSV(csv));
+        const arrayFromMidFile = parseCSV(csvText1); // 中間ファイル⑨
+        const arrayFromOldAdressFile = parseCSV(csvText2); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイル
+        const arrayFromTaxMasterFile = parseCSV(csvText3); // 税情報マスタファイル
 
-        // 各ファイルヘッダー内の「ＦＩ－」を取り除く
-        parsedCSVs.forEach(parsed => parsed.header = removeStrFromHeader(parsed.header, "ＦＩ－"));
+        // 各ファイルのヘッダー行を取得する
+        const midFileHeader = arrayFromMidFile.header;
+        const oldAddressFileHeader = arrayFromOldAdressFile.header;
+        const taxMasterFileHeader = arrayFromTaxMasterFile.header;
 
         // 各ファイル内の必要なカラムのインデックスを取得する
-        const addressNumIndex1 = parsedCSVs[0].header.indexOf('宛名番号'); // 中間ファイル⑩の宛名番号カラム
-        const causeForRectificationIndex = parsedCSVs[0].header.indexOf('更正事由'); // 中間ファイル⑩の更正事由カラム
-        const incomePercentageIndex = parsedCSVs[0].header.indexOf('所得割額'); // 中間ファイル⑩の所得割額カラム
-        const equalPercentageIndex = parsedCSVs[0].header.indexOf('均等割額'); // 中間ファイル⑩の均等割額カラム
-        const taxClassIndex = parsedCSVs[0].header.indexOf('課税区分'); // 中間ファイル⑩の課税区分カラム
-        const oldAddressNumIndex = parsedCSVs[1].header.indexOf('旧宛名番号'); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの旧宛名番号カラム
-        const addressNumIndex3 = parsedCSVs[2].header.indexOf('宛名番号'); // 賦課マスタファイルの宛名番号カラム
+        const addressNumIndex1 = midFileHeader.indexOf('宛名番号'); // 中間ファイル⑨の宛名番号カラム（税情報更新時のキーとして使用）
+        const incomeBracketIndex = midFileHeader.indexOf('所得割額'); // 中間ファイル⑨の所得割額のインデックスを取得（更新がかかる税情報として使用）
+        const equalPercentageIndex = midFileHeader.indexOf('均等割額'); // 中間ファイル⑨の均等割額のインデックスを取得（更新がかかる税情報として使用）
+        const causeForCorrectionIndex = midFileHeader.indexOf('更正事由'); // 中間ファイル⑨の更正事由のインデックスを取得（更新がかかる税情報として使用）
+        const taxClassIndex = midFileHeader.indexOf('課税区分'); // 中間ファイル⑨の課税区分のインデックスを取得（更新がかかる税情報として使用）
+        const addressNumIndex2 = oldAddressFileHeader.indexOf('宛名番号'); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの宛名番号カラム（税情報更新時のキーとして使用）
+        const residentIdIndex = oldAddressFileHeader.indexOf('住民票コード'); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの住民票コードカラム（更新時の条件判定で使用）
+        const residentDateIndex = oldAddressFileHeader.indexOf('住民日'); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの住民日カラム（更新時の条件判定で使用）
+        const eliminationFlagIndex = oldAddressFileHeader.indexOf('消除フラグ'); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの消除フラグカラム（更新時の条件判定で使用）
+        const eliminationDateIndex = oldAddressFileHeader.indexOf('消除日'); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの消除日カラム（更新時の条件判定で使用）
+        const addressNumIndex3 = taxMasterFileHeader.indexOf('宛名番号'); // 税情報マスタファイルの宛名番号カラム（税情報更新時のキーとして使用）
+        const causeForCorrectionIndex2 = taxMasterFileHeader.indexOf('更正事由'); // 税情報マスタファイルの更正事由カラム（更新する税情報として使用）
+        const amountPreliminaryIndex = taxMasterFileHeader.indexOf('金額予備１０'); // 税情報マスタの金額予備１０のインデックスを取得（更新する税情報として使用）
+        const equalPercentageIndex2 = taxMasterFileHeader.indexOf('均等割額'); // 税情報マスタの均等割額のインデックスを取得（更新する税情報として使用）
 
-        // 最終的に「現宛名番号の住民票コードに紐づく旧宛名番号」ファイルと「賦課マスタ」をマージした結果を格納する配列を定義する
-        const oldAddressmergedData = [];
+        // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
+        const missingColumns = [];
+        if (addressNumIndex1 === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (incomeBracketIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：所得割額');
+        }
+        if (equalPercentageIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：均等割額');
+        }
+        if (causeForCorrectionIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：更正事由');
+        }
+        if (taxClassIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[0].name + ' >> 不足カラム名：課税区分');
+        }
+        if (addressNumIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (residentIdIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：住民票コード');
+        }
+        if (residentDateIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：住民日');
+        }
+        if (eliminationFlagIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：消除フラグ');
+        }
+        if (eliminationDateIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[1].name + ' >> 不足カラム名：消除日');
+        }
+        if (addressNumIndex3 === -1) {
+            missingColumns.push('■ファイル名：' + files[2].name + ' >> 不足カラム名：宛名番号');
+        }
+        if (causeForCorrectionIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[2].name + ' >> 不足カラム名：更正事由');
+        }
+        if (amountPreliminaryIndex === -1) {
+            missingColumns.push('■ファイル名：' + files[2].name + ' >> 不足カラム名：金額予備１０');
+        }
+        if (equalPercentageIndex2 === -1) {
+            missingColumns.push('■ファイル名：' + files[2].name + ' >> 不足カラム名：均等割額');
+        }
 
-        // 一時的に「現宛名番号の住民票コードに紐づく旧宛名番号」ファイルと「賦課マスタ」をマージするためのMap（作業領域）を定義する
-        const oldAddressNumMap = new Map();
+        if (missingColumns.length > 0) {
+            throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
+        }
 
-        // 「現宛名番号の住民票コードに紐づく旧宛名番号」ファイルをマッピングする
-        parsedCSVs[1].rows.forEach(row => {
-            const oldAddressNum = row[oldAddressNumIndex];
-            const rowObj = parsedCSVs[1].header.reduce((obj, header, i) => {
-                obj[header] = row[i];
-                return obj;
-            }, {});
-            oldAddressNumMap.set(oldAddressNum, rowObj);
-        });
+        // 「消除日」カラムの比較処理で使用する日付を定義する
+        const targetDataForEliminationDate = new Date('2024-06-04 00:00:00');
+        // 「住民日」カラムの比較処理で使用する日付を定義する
+        const targetDataForresidentDate = new Date('2024-01-02 00:00:00');
 
-        // 「現宛名番号の住民票コードに紐づく旧宛名番号」ファイルの「旧宛名番号」と、「賦課マスタ」ファイルの「宛名番号」をキーにして、2ファイルをマージする
-        parsedCSVs[2].rows.forEach(row => {
-            const levyAddressNum = row[addressNumIndex3];
-            const rowObj = parsedCSVs[2].header.reduce((obj, header, i) => {
-                obj[header] = row[i];
-                return obj;
-            }, {});
-            if (oldAddressNumMap.has(levyAddressNum)) {
-                // 後続処理では「旧宛名番号」ではなく「現宛名番号」をキーとするため、Mapに格納したデータをkeyを設定しない配列に再格納する
-                const mergedObj = { ...oldAddressNumMap.get(levyAddressNum), ...rowObj };
-                oldAddressmergedData.push(mergedObj);
+        // 後続の処理で使用する用に変数定義：消除フラグ（現宛名番号の住民票コードに紐づく旧宛名番号ファイルのカラム）
+        let eliminationFlag;
+        // 後続の処理で使用する用に変数定義：消除日（現宛名番号の住民票コードに紐づく旧宛名番号ファイルのカラム）
+        let eliminationDate;
+        // 後続の処理で使用する用に変数定義：住民日（現宛名番号の住民票コードに紐づく旧宛名番号ファイルのカラム）
+        let residentDate;
+        // 後続の処理で使用する用に変数定義：新宛名番号（中間ファイル⑨に検索をかけに行く用）
+        let newAddressNum;
+        // 後続の処理で使用する用に変数定義：旧宛名番号（税情報マスタに検索をかけに行く用）
+        let oldAddressNum;
+        // 後続の処理で使用する用に変数定義：金額予備１０（税情報マスタのカラム）
+        let amountPreliminary;
+        // 後続の処理で使用する用に変数定義：均等割額（税情報マスタのカラム）
+        let equalPercentage;
+        // 後続の処理で使用する用に変数定義：更正事由（税情報マスタのカラム）
+        let causeForCorrection;
+        // 後続の処理で使用する用に変数定義：現宛名番号の住民票コードに紐づく旧宛名番号ファイルにて、同住民票コードが存在する場合の「現存者」のデータ
+        let existFlagData;
+        // 後続の処理で使用する用に変数定義：中間ファイル⑨にて検索にヒットした行
+        let matchedMidFileData;
+        // 後続の処理で使用する用に変数定義：税情報マスタにて検索にヒットした行
+        let matchedTaxMasterData;
+
+        // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの行を、住民票コードの値ごとにグループ化する処理
+        // 住民票コードをキーとしたグループを格納するためのオブジェクトを作成する
+        const groupedOldAddressData = {};
+        arrayFromOldAdressFile.rows.forEach(line => {
+            // 住民票コードの値を取得する
+            const residentId = line[residentIdIndex];
+            // 住民票コードをキーとしたグループが存在しない場合は、新たに空の配列を作成する
+            if (!groupedOldAddressData[residentId]) {
+                groupedOldAddressData[residentId] = [];
             }
+            // 住民票コードをキーとしたグループに行を追加する
+            groupedOldAddressData[residentId].push(line);
         });
 
-        // 2ファイルをマージしたデータに対し、「所得割額」「均等割額」「更正事由」カラムの値を利用して課税区分判定を行う
-        oldAddressmergedData.forEach((value) => {
-            // 条件分岐に使用するカラムの値を定義する
-            const incomePercentage = Number(value['所得割額']);
-            const equalPercentage = Number(value['均等割額']);
-            const causeForCorrection = String(value['更正事由']);
-            // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
-            if (incomePercentage == 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
-                value['課税区分'] = '1';
-                // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
-            } else if (incomePercentage == 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
-                value['課税区分'] = '2';
-                // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
-            } else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
-                value['課税区分'] = '3';
-                // 「所得割額」が1以上のときは「均等割額」が1以上になるはずのため、「均等割額」が0のものはエラーとして投げる
-            } else if (incomePercentage > 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
-                throw new Error('【宛名番号：' + String(value['宛名番号']) + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
-                // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
-            } else if (causeForCorrection.startsWith("03")) {
-                value['課税区分'] = '4';
-            } else {
-                value['課税区分'] = '';
+        // 住民票コードをキーとしたグループごとに、格納された行数によって処理を分岐する
+        for (const [residentId, rows] of Object.entries(groupedOldAddressData)) {
+            // 以下、格納された行数が1行である場合の処理
+            if (rows.length === 1) {
+                // 「消除フラグ」の値を取得する
+                eliminationFlag = rows[0][eliminationFlagIndex];
+
+                // 「消除フラグ」の値が「現存者」である場合は、中間ファイル⑨の宛名番号が一致する行の「課税区分」を「4（＝未申告）」に更新する
+                if (eliminationFlag === '現存者') {
+                    // 「宛名番号」の値を取得する
+                    newAddressNum = rows[0][addressNumIndex2];
+                    // 中間ファイル⑨にて、「宛名番号」が一致する行を検索し、一致する行があれば「課税区分」を「4（＝未申告）」に更新する
+                    matchedMidFileData = arrayFromMidFile.rows.find(data => data[addressNumIndex1] === newAddressNum);
+                    if (matchedMidFileData) {
+                        matchedMidFileData[taxClassIndex] = '4';
+                    }
+                }
+                //「消除フラグ」の値が「消除者」である場合は、「消除日」の値を取得し、その値によって給付対象/非対象を判定する
+                else if (eliminationFlag === '消除者') {
+                    // 「消除日」の値をDate形で取得する
+                    eliminationDate = parseDate(rows[0][eliminationDateIndex]);
+
+                    // 「消除日」が2024/6/4以降の場合は、中間ファイル⑨の宛名番号が一致する行の「課税区分」を「4（＝未申告）」に更新する
+                    if (eliminationDate >= targetDataForEliminationDate) {
+                        // 宛名番号を取得する
+                        newAddressNum = rows[0][addressNumIndex2];
+                        // 中間ファイル⑩にて、宛名番号が一致する行を検索する
+                        matchedMidFileData = arrayFromMidFile.rows.find(data => data[addressNumIndex1] === newAddressNum);
+                        if (matchedMidFileData) {
+                            // 該当宛名番号の行の「課税区分」を「4（＝未申告）」に更新する
+                            matchedMidFileData[taxClassIndex] = '4';
+                        }
+                    }
+                    // 「消除日」が2024/6/4より前の場合は、中間ファイル⑩の宛名番号が一致する行の「課税区分」を「3（＝課税対象）」に更新する
+                    else if (eliminationDate < targetDataForEliminationDate) {
+                        // 現宛名番号の住民票コードに紐づく旧宛名番号ファイルの宛名番号を取得する
+                        newAddressNum = rows[0][addressNumIndex2];
+                        // 中間ファイル⑩にて、宛名番号が一致する行を検索する
+                        matchedMidFileData = arrayFromMidFile.rows.find(data => data[addressNumIndex1] === newAddressNum);
+                        if (matchedMidFileData) {
+                            // 該当宛名番号の行の「課税区分」を「3（＝課税）」に更新する
+                            matchedMidFileData[taxClassIndex] = '3';
+                        }
+                    }
+                }
             }
-        });
+            // 以下、格納された行数が2行以上である場合の処理
+            else if (rows.length >= 2) {
+                // 消除フラグが「現存者」である行が存在するかを確認する
+                existFlagData = rows.find(data => data[eliminationFlagIndex] === '現存者');
 
-        // 中間ファイル⑩の「宛名番号」がmergedData内の「現宛名番号」と一致する行について、各税情報カラムの値を更新する処理
-        const updatedRows = parsedCSVs[0].rows.map(line => {
-            const addressNum = line[addressNumIndex1];
-            // 中間ファイル⑩の「宛名番号」がmergedData内の「現宛名番号」と一致する行を検索する
-            const matchedData = oldAddressmergedData.find(data => data['現宛名番号'] === addressNum);
-            if (matchedData) {
-                // 中間ファイル⑩内の「所得割額」「均等割額」「課税区分」「更正事由」カラムの値を更新する
-                line[incomePercentageIndex] = matchedData['所得割額'];
-                line[equalPercentageIndex] = matchedData['均等割額'];
-                line[taxClassIndex] = matchedData['課税区分'];
-                line[causeForRectificationIndex] = matchedData['更正事由'];
+                if (existFlagData) {
+                    // 消除フラグが「現存者」である行の「宛名番号」の値を取得する（＝新宛名番号）
+                    newAddressNum = existFlagData[addressNumIndex2];
+                    // 消除フラグが「現存者」である行の「住民日」の値をDate形で取得する
+                    residentDate = parseDate(existFlagData[residentDateIndex]);
+
+                    // 「住民日」が2024/1/2以降の場合の処理
+                    if (residentDate >= targetDataForresidentDate) {
+                        // 「消除フラグ」が「消除者」である行を全行取得する
+                        const eliminationData = rows.filter(data => data[eliminationFlagIndex] === '消除者');
+                        // 「消除フラグ」が「消除者」である行の中で、「住民日」が2024/1/1以前かつデータ内で一番新しい行を取得する
+                        const latestEliminationData = eliminationData.reduce((a, b) => {
+                            return parseDate(a[eliminationDateIndex]) > parseDate(b[eliminationDateIndex]) ? a : b;
+                        });
+                        // 「消除フラグ」が「消除者」である行の中で、「住民日」が2024/1/1以前かつデータ内で一番新しい行の宛名番号を取得する（＝旧宛名番号）
+                        oldAddressNum = latestEliminationData[addressNumIndex2];
+
+                        //税情報マスタにて、旧宛名番号と一致する行を検索する
+                        matchedTaxMasterData = arrayFromTaxMasterFile.rows.find(data => data[addressNumIndex3] === oldAddressNum);
+                        if (matchedTaxMasterData) {
+                            // 旧宛名番号と一致する行の「金額予備１０」「均等割額」「更正事由」を取得する（Number型での取得時、デフォルトでは空だと0になるため、空の場合は空文字にする
+                            amountPreliminary = matchedTaxMasterData[amountPreliminaryIndex] ? Number(matchedTaxMasterData[amountPreliminaryIndex]) : '';
+                            equalPercentage = matchedTaxMasterData[equalPercentageIndex2] ? Number(matchedTaxMasterData[equalPercentageIndex2]) : ''; 
+                            causeForCorrection = String(matchedTaxMasterData[causeForCorrectionIndex2]);
+
+                            // 中間ファイル⑩にて、新宛名番号と一致する行を検索する
+                            matchedMidFileData = arrayFromMidFile.rows.find(data => data[addressNumIndex1] === newAddressNum);
+                            if (matchedMidFileData) {
+                                // 該当宛名番号の行の「所得割額」「均等割額」「更正事由」を、旧宛名番号と紐づく税情報で更新する
+                                matchedMidFileData[incomeBracketIndex] = amountPreliminary;
+                                matchedMidFileData[equalPercentageIndex] = equalPercentage;
+                                matchedMidFileData[causeForCorrectionIndex] = causeForCorrection;
+
+                                // 更新後の各税情報カラムの値を使用し、課税区分を判定する
+                                // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
+                                if (matchedMidFileData[incomeBracketIndex] == 0 && matchedMidFileData[equalPercentageIndex] == 0 && !matchedMidFileData[causeForCorrectionIndex].startsWith("03")) {
+                                    matchedMidFileData[taxClassIndex] = '1';
+                                }
+                                // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+                                else if (matchedMidFileData[incomeBracketIndex] == 0 && matchedMidFileData[equalPercentageIndex] > 0 && !matchedMidFileData[causeForCorrectionIndex].startsWith("03")) {
+                                    matchedMidFileData[taxClassIndex] = '2';
+                                }
+                                // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
+                                else if (matchedMidFileData[incomeBracketIndex] > 0 && matchedMidFileData[equalPercentageIndex] > 0 && !matchedMidFileData[causeForCorrectionIndex].startsWith("03")) {
+                                    matchedMidFileData[taxClassIndex] = '3';
+                                }
+                                // 「所得割額」が1以上のときは「均等割額」が1以上になるはずのため、「均等割額」が0のものはエラーとして投げる
+                                else if (matchedMidFileData[incomeBracketIndex] > 0 && matchedMidFileData[equalPercentageIndex] == 0 && !matchedMidFileData[causeForCorrectionIndex].startsWith("03")) {
+                                    throw new Error('【宛名番号：' + oldAddressNum + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
+                                }
+                                // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
+                                else if (matchedMidFileData[causeForCorrectionIndex].startsWith("03")) {
+                                    matchedMidFileData[taxClassIndex] = '4';
+                                }
+                                else {
+                                    matchedMidFileData[taxClassIndex] = '';
+                                }
+                            }
+                        }
+                        // // 税情報マスタにて、旧宛名番号と一致する行が存在しない場合はエラーを表示する
+                        // else if (!matchedTaxMasterData) {
+                        //     throw new Error('■住民票コード：' + residentId + ' >> 税情報マスタに該当する行が存在しませんでした。インプットファイルを確認してください。');
+                        // }
+                    }
+                    // 「現存者」の「住民日」が2024/1/2より前の場合はありえないため、エラーを表示する
+                    else if (residentDate < targetDataForresidentDate) {
+                        throw new Error('■住民票コード：' + residentId + ' >> 現存者かつ住民日が2024/1/2より前の行が存在しました。インプットファイルを確認してください。');
+                    }
+                }
+                // 同住民表コードの行が複数行あるのにも関わらず、その中に消除フラグが「現存者」である行が存在しない場合はエラーを表示する
+                else if (existFlagData){
+                    throw new Error('■住民票コード：' + residentId + ' >> 消除フラグ「現存者」の行が存在しませんでした。インプットファイルを確認してください。');
+                }
             }
-            return line;
-        });
+        }
 
-        // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-        return formatOutputFile(parsedCSVs[0].header, updatedRows, NEWLINE_CHAR_CRLF);
+        // 更新された中間ファイル⑩のデータを再度カンマで結合し、改行で区切られた文字列に変換
+        return formatOutputFile(midFileHeader, arrayFromMidFile.rows, NEWLINE_CHAR_CRLF);
     }
 }
 
@@ -3260,7 +3418,7 @@ function amountReserveSupport() {
         const incomeBracketIndex2 = LevyMasterheader.indexOf('所得割額'); // 税情報マスタの所得割額のインデックスを取得
         const equalPercentageIndex2 = LevyMasterheader.indexOf('均等割額'); // 税情報マスタの均等割額のインデックスを取得
         const amountPreliminaryIndex = LevyMasterheader.indexOf('金額予備１０'); // 税情報マスタの金額予備１０のインデックスを取得
-        
+
         // エラーハンドリング（必要なカラムが存在しない場合、ファイル名とカラムを表示する）
         const missingColumns = [];
         if (addressNumIndex1 === -1) {
@@ -3294,19 +3452,19 @@ function amountReserveSupport() {
         if (missingColumns.length > 0) {
             throw new Error('以下のカラムが見つかりません。ファイルの確認をお願いします。\n' + missingColumns.join('\n'));
         }
-        
+
         // 税情報マスタの宛名番号をキーにして、「所得割額」「均等割額」「金額予備１０」をマップに格納する処理
         const taxMap = new Map();
         arrayFromLevyMasterFile.rows.forEach(levyrow => {
             // 税情報マスタの宛名番号を取得する（マップのキーとなる）
-            const addressNumFromLevyMasterFile = levyrow[addressNumIndex2] 
+            const addressNumFromLevyMasterFile = levyrow[addressNumIndex2]
             // 税情報マスタの「金額予備１０」を取得する。ここでnumber型に変換するが、空の場合Number型で取得すると0になるため、空の場合は空文字にする
             const amountPreliminaryFromLevyMasterFile = levyrow[amountPreliminaryIndex] ? Number(levyrow[amountPreliminaryIndex]) : '';
             // 「所得割額」「均等割額」も「金額予備１０」と同様に、number型に変換した値、もしくは空文字を取得する
             const incomeBracketFromLevyMasterFile = levyrow[incomeBracketIndex2] ? Number(levyrow[incomeBracketIndex2]) : '';
             const equalPercentageFromLevyMasterFile = levyrow[equalPercentageIndex2] ? Number(levyrow[equalPercentageIndex2]) : '';
             // 宛名番号をキーにして、「所得割額」「均等割額」「金額予備１０」をマップに格納する
-            taxMap.set(addressNumFromLevyMasterFile, {incomeBracket: incomeBracketFromLevyMasterFile, equalPercentage: equalPercentageFromLevyMasterFile, amountPreliminary: amountPreliminaryFromLevyMasterFile});
+            taxMap.set(addressNumFromLevyMasterFile, { incomeBracket: incomeBracketFromLevyMasterFile, equalPercentage: equalPercentageFromLevyMasterFile, amountPreliminary: amountPreliminaryFromLevyMasterFile });
         });
 
         // 中間ファイル⑩にて、宛名番号に対応する各税情報カラムを更新する処理
@@ -3317,10 +3475,10 @@ function amountReserveSupport() {
             // 税情報マスタに宛名番号が存在する場合、後続処理を行う
             if (taxMap.has(addressNumFromMidFile)) {
                 // 税情報マスタの各カラム値を取得する
-                const {incomeBracket, equalPercentage, amountPreliminary} = taxMap.get(addressNumFromMidFile);
+                const { incomeBracket, equalPercentage, amountPreliminary } = taxMap.get(addressNumFromMidFile);
                 // （共通の処理）中間ファイル⑩の「均等割額」カラムに税情報マスタの「均等割額」の値を入力する
                 midRow[equalPercentageIndex] = equalPercentage;
-            
+
                 // 「金額予備１０」の値が空でない場合、「金額予備１０」の値を中間ファイル⑩の「所得割額」カラムに入力する
                 if (amountPreliminary !== '') {
                     midRow[incomeBracketIndex] = amountPreliminary;
@@ -3338,19 +3496,19 @@ function amountReserveSupport() {
                 // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
                 else if (midRow[incomeBracketIndex] == 0 && midRow[equalPercentageIndex] > 0 && !causeForCorrection.startsWith("03")) {
                     midRow[taxClassIndex] = '2';
-                } 
+                }
                 // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
                 else if (midRow[incomeBracketIndex] > 0 && midRow[equalPercentageIndex] > 0 && !causeForCorrection.startsWith("03")) {
                     midRow[taxClassIndex] = '3';
-                } 
+                }
                 // 「所得割額」が1以上のときは「均等割額」が1以上になるはずのため、「均等割額」が0のものはエラーとして投げる
                 else if (midRow[incomeBracketIndex] > 0 && midRow[equalPercentageIndex] == 0 && !causeForCorrection.startsWith("03")) {
                     throw new Error('【宛名番号：' + addressNumFromMidFile + 'の課税情報】\n「所得割額」が1以上ですが「均等割額」が0となっております。インプットファイルを確認してください。')
-                } 
+                }
                 // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定（念のため判定）
                 else if (causeForCorrection.startsWith("03")) {
                     midRow[taxClassIndex] = '4';
-                } 
+                }
                 else {
                     midRow[taxClassIndex] = '';
                 }
