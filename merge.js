@@ -3739,393 +3739,6 @@ function generateFilesforConfirmationTargetImport() {
     }
 }
 
-/**
-* 給付対象者ファイルの形式に整形する処理。直接振込or確認書は第三引数を使用することによって判断し、抽出条件を出し分ける。
-* @param {Array} columnIndices - カラムインデックスの配列
-* @param {Array} rows - 中間ファイルの行の配列
-* @param {String} benefitType - 給付形態を記載する。直接給付の場合は「push」確認書対象の場合は「confirmation」を設定する
-* @param {Array} header - ヘッダー行の配列。プッシュ対象者抽出処理の場合は使用しないため、デフォルト値を設定する
-* @returns {String} 給付対象者ファイルの文字列
-* @returns {String} 中間ファイルの文字列（確認書対象者抽出処理の場合のみ）
-*/
-function generateBeneficiaryfile(columnIndices, rows, benefitType, header = []) {
-    // 直接給付・確認書両方向け：最終的にreturnする給付対象者ファイルのデータを格納する変数を定義する
-    let beneficiaryText = [];
-    // 直接給付・確認書両方向け：抽出対象世帯の世帯主行を格納するリストを定義する
-    let filteredLines = [];
-    // 直接給付・確認書両方向け：出力する行を格納するリストを定義する
-    let outputLines = [];
-    // 確認書向け：最終的にreturnする給付対象外住民ファイル（中間ファイル）のデータを格納する変数を定義する
-    let midfileText = [];
-    // 確認書向け：非抽出対象世帯の世帯主行を格納するリストを定義する
-    let nonFilteredLines = [];
-    // 確認書向け：確認書対象者と判定されなかった住民行を格納するリストを定義する
-    let nonConfirmationTargetLines = [];
-    // 性別カラムの変換時、中間ファイル内の性別コードが「1」「2」の場合にエラーを出力するため、エラー出力用のリストを定義する
-    const genderErrorAddressNums = [];
-    // 続柄カラムの変換時、中間ファイル⑦内の続柄１が空の場合にエラーを出力するため、エラー出力用のリストを定義する
-    const relationshipErrorAddressNums = [];
-    // 課税区分が「3」の場合、課税対象の住民（＝給付対象になりえない住民）が混ざっているということなので、エラーとして表示する。そのためのリストを定義する
-    const taxClassErrorAddressNums = [];
-    // 確認書対象抽出時の抽出条件である、課税区分（「1（非課税対象）」「2（均等割対象）」「4（未申告）」）を定義する
-    const taxClass = ['1', '2', '4'];
-    // 給付対象者ファイルのヘッダーを定義する
-    const beneficiaryFileHeader = [
-        '宛名番号',
-        '受給者宛名番号',
-        '氏名',
-        '氏名フリガナ',
-        '生年月日',
-        '性別',
-        '電話番号',
-        '郵便番号',
-        '住所',
-        '方書',
-        '異動元郵便番号',
-        '異動元住所',
-        '異動元方書',
-        '世帯番号',
-        '世帯主宛名番号',
-        '続柄',
-        '郵送対象者フラグ',
-        '通称名',
-        '通称名カナ',
-        'フォーマット種別',
-        '課税区分',
-        '住民カスタム属性',
-        '転入日',
-        '賦課期日居住者フラグ',
-        '照会対象フラグ',
-        '賦課無フラグ',
-        '課税保留フラグ',
-        '租税条約免除フラグ',
-        '生活扶助非課税フラグ',
-        '対象者_課税フラグ',
-        '対象者_市減免後均等割額',
-        '対象者_県減免後均等割額',
-        '扶養関連者宛名番号', // 項目名変更：2024/7/30 出力カラムの追加のため
-        '扶養主_課税フラグ',
-        '扶養主_市免除後均等割額',
-        '扶養主_県免除後均等割額',
-        '専従関連者宛名番号', // 項目名変更：2024/7/30 出力カラムの追加のため
-        '専従主_課税フラグ',
-        '専従主_市減免後均等割額',
-        '専従主_県減免後均等割額',
-        '生活扶助認定年月日',
-        '生活扶助廃止年月日',
-        '多子加算対象者フラグ',
-        '夫婦関連者宛名番号', // 項目追加：2024/7/30 出力カラムの追加のため
-        '均等割額', // 項目追加：2024/7/30 出力カラムの追加のため
-        '所得割額（定額減税前）' // 項目追加：2024/7/30 出力カラムの追加のため
-    ];
-
-    // 直接振込の場合の対象者抽出処理（口座名義カラム・口座番号カラムが空でない行（世帯主行）及び、世帯番号で紐づく世帯員行を抽出する）
-    if (benefitType === 'push') {
-        // 口座名義カラム・口座番号カラムが空でない（直接振込対象世帯の世帯主）行を抽出する
-        filteredLines = rows.filter(line => line[columnIndices[17]] && line[columnIndices[18]]);
-        // 口座名義カラム・口座番号カラムが空でない（直接振込対象世帯の世帯主）行毎に、宛名番号・世帯番号を取得後、出力用リストに追加する処理を行う
-        filteredLines.forEach(line => {
-            const addressNum = line[columnIndices[0]]; // 宛名番号を取得する
-            const householdNum = line[columnIndices[9]]; // 世帯番号を取得する
-
-            // 世帯主行を出力用リストに追加する。その際、「受給者宛名番号」は空に設定する
-            outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, ''));
-
-            // 世帯番号をキーにして、世帯主以外の世帯員レコードを取得する
-            const householdMemberLines = rows.filter(otherLine => otherLine[columnIndices[9]] === householdNum && otherLine !== line);
-
-            // 世帯員の行を出力用リストに追加する。その際、「受給者宛名番号」に世帯主の宛名番号を設定する
-            householdMemberLines.forEach(line => {
-                outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, addressNum));
-            });
-        });
-    }
-
-    // 確認書の場合の対象者抽出処理（課税区分が「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかである世帯主行及び、その世帯員行を抽出する）
-    else if (benefitType === 'confirmation') {
-        // 課税区分が「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかであるかつ続柄１が「02（世帯主）である行を抽出する
-        filteredLines = rows.filter(line => taxClass.includes(line[columnIndices[23]]) && line[columnIndices[10]] === '02');
-
-        // 課税区分が「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかでないかつ続柄１が「02（世帯主）である行を抽出する
-        nonFilteredLines = rows.filter(line => !taxClass.includes(line[columnIndices[23]]) && line[columnIndices[10]] === '02');
-
-        // 抽出した行（世帯主行）毎に、宛名番号・世帯番号を取得する。
-        filteredLines.forEach(line => {
-            const addressNum = line[columnIndices[0]]; // 宛名番号を取得する
-            const householdNum = line[columnIndices[9]]; // 世帯番号を取得する
-
-            // 世帯番号をキーにして、世帯主以外の世帯員レコードを取得する
-            const householdMemberLines = rows.filter(otherLine => otherLine[columnIndices[9]] === householdNum && otherLine !== line);
-
-            // 取得した同世帯番号の全員の課税区分も「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかであるかを確認する
-            const isAllTaxClassMatched = householdMemberLines.every(householdMemberLine => taxClass.includes(householdMemberLine[columnIndices[23]]));
-
-            // 世帯全員が該当する場合のみ抽出対象世帯とし、後続処理を実行する
-            if (isAllTaxClassMatched) {
-                // 世帯主行を出力用リストに追加する。その際、「受給者宛名番号」は空に設定する
-                outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, ''));
-
-                // 世帯員の行を出力用リストに追加する。その際、「受給者宛名番号」に世帯主の宛名番号を設定する
-                householdMemberLines.forEach(line => {
-                    outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, addressNum));
-                });
-            }
-            // 世帯全員が該当しない場合は確認書対象外世帯と判断し、中間ファイル⑪に出力する
-            else {
-                nonConfirmationTargetLines.push(line); // 世帯主行
-                nonConfirmationTargetLines.push(...householdMemberLines); // 世帯主以外の世帯員行
-            }
-        });
-
-        // nonFilteredLinesに格納されている行の世帯番号を取得し、その世帯番号に含まれる行を全て中間ファイル出力用リストに追加する
-        nonFilteredLines.forEach(line => {
-            const householdNum = line[columnIndices[9]]; // 世帯番号を取得する
-            const householdLines = rows.filter(otherLine => otherLine[columnIndices[9]] === householdNum);
-            nonConfirmationTargetLines.push(...householdLines);
-        });
-    }
-
-    /**
-     * 抽出後の行のうち必要なカラムのみを抽出し、出力用の行を作成する処理
-     * @param {Array} line - 出力用の行を作成する元となる行
-     * @param {Array} columnIndices - 出力用の行を作成する元となる行のカラムインデックス
-     * @param {String} addressNum - 出力用の行に設定する「受給者宛名番号」（世帯主の場合は空（''）、他世帯員の場合は世帯主の宛名番号を引数として設定する）
-     * @returns {Array} 必要なカラムのみを抽出し、出力用の行を作成した結果
-    */
-    function createOutputLineForBeneficiaryFile(line, columnIndices, addressNum) {
-        let semiProcessedAddressNum = addressNum;
-        // 引数「addressNum」が空でない場合、15桁の宛名番号に変換する
-        if (addressNum !== '') {
-            semiProcessedAddressNum = addressNum.toString().padStart(15, '0');
-        }
-        // 定数として定義しなおす
-        const processedAddressNum = semiProcessedAddressNum
-
-        // 性別コードを変換し、エラーがあればエラー出力用リストに対象の宛名番号を追加する
-        let genderCode = convertGenderCode(line[columnIndices[4]]);
-        if (genderCode === '') {
-            genderErrorAddressNums.push(line[columnIndices[0]]);
-        }
-
-        // 続柄コードを変換し、エラーがあればエラー出力用リストに対象の宛名番号を追加する
-        let relationshipCode = convertRelationshipCode(line[columnIndices[10]], line[columnIndices[11]], line[columnIndices[12]], line[columnIndices[13]]);
-        if (relationshipCode === '') {
-            relationshipErrorAddressNums.push(line[columnIndices[0]]);
-        }
-
-        // 多子加算対象住民に対してフラグを立てる（デフォルト値は「0（多子加算非対象）」を設定する）
-        let semiChildAmountFlg = '0';
-        // 日付比較用に、生年月日カラムの値をdate型にする
-        const birthDate = parseDate(line[columnIndices[3]]);
-        // 日付比較用に、H18(2006).4.2をdate型にする
-        const targetDate = new Date('2006-04-02 00:00:00');
-        // 多子加算判定を実施する（世帯主（続柄１が「02」）ではないかつ、生年月日がH18(2006).4.2以降である場合に多子加算対象者とする）
-        if (line[columnIndices[10]] !== '02' && birthDate >= targetDate) {
-            semiChildAmountFlg = '1';
-        }
-        // 定数として定義しなおす
-        const childAmountFlg = semiChildAmountFlg
-
-        // 通称名の使用有無を判断する処理（「外国人氏名優先区分」カラムに「3」が入力されている場合、通称名を入力する。デフォルト値は空）
-        let semiNickname = '';
-        let semiNicknameKana = '';
-        // 通称名の使用有無を判断する（「外国人氏名優先区分」カラムに「3」が入力されている場合、通称名を設定する）
-        if (line[columnIndices[22]] == '3') {
-            semiNickname = line[columnIndices[14]]; // 住基内「外国人通称名」カラムの値を入力
-            semiNicknameKana = line[columnIndices[15]]; // 住基内「外国人カナ通称名」カラムの値を入力
-        }
-        // 定数として定義しなおす
-        const nickname = semiNickname;
-        const nicknameKana = semiNicknameKana;
-
-        // インプット内「課税区分」の値を参照し、日本語化した文字列（「非課税対象」「均等割対象」）を、アウトプットの「住民カスタム属性」に出力する処理
-        const inputTaxClass = String(line[columnIndices[23]]); // 判定で数回使用するため、定数として定義しておく
-        let outputTaxClass = ''; // 出力用の変数を定義する
-
-        // インプットファイル内「続柄１」カラムの値が「02（＝世帯主）」である場合のみ、課税区分を判定する処理を行う
-        if (line[columnIndices[10]] === '02') {
-            // 以下、課税区分の値を参照し、日本語化した文字列を変数に格納する処理
-            if (inputTaxClass === '1') {
-                outputTaxClass = '非課税対象';
-            }
-            else if (inputTaxClass === '2') {
-                outputTaxClass = '均等割対象';
-            }
-            else if (inputTaxClass === '3') {
-                // 課税区分が「3」の場合、課税対象の住民（＝給付対象になりえない住民）が混ざっているということなので、エラーとして表示する
-                taxClassErrorAddressNums.push(line[columnIndices[0]]);
-            }
-            else if (inputTaxClass === '4') {
-                outputTaxClass = '未申告';
-            }
-        }
-
-        return [
-            // 以下、テンプレートのカラム  
-            line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号（15桁に変換する）
-            processedAddressNum, // 受給者宛名番号（世帯主の場合は空、他世帯員の場合は世帯主の宛名番号を15桁に変換した番号を設定する）
-            line[columnIndices[1]] || line[columnIndices[16]],// 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
-            line[columnIndices[2]], // カナ氏名
-            separateDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
-            genderCode, // 性別
-            excludeHyphen(line[columnIndices[5]]), // 電話番号（ハイフンを除去する）
-            excludeHyphen(line[columnIndices[6]]), // 郵便番号（ハイフンを除去する）
-            line[columnIndices[7]], // 住所
-            line[columnIndices[8]], // 方書
-            '', // 異動元郵便番号
-            '', // 異動元住所
-            '', // 異動元方書
-            line[columnIndices[9]].toString().padStart(15, '0'), // 世帯番号
-            '', // 世帯主宛名番号（世帯主行は空にする）
-            relationshipCode, // 続柄
-            '1', // 郵送対象者フラグ（郵送対象者のため「1」を設定）
-            nickname, // 外国人通称名
-            nicknameKana, // 外国人カナ通称名
-            '非課税均等割確認書', // フォーマット種別（固定値）
-            'R6S1SBS', // 課税区分（固定値）
-            outputTaxClass, // 住民カスタム属性（「課税区分」の値を参照し、日本語化した文字列を入力する）
-            // 以下、非課税・均等割特有のカラム
-            '', // 転入日
-            '', // 賦課期日居住者フラグ
-            '', // 照会対象フラグ
-            '', // 賦課無フラグ
-            '', // 課税保留フラグ
-            '', // 租税条約免除フラグ
-            '', // 生活扶助非課税フラグ
-            '', // 対象者_課税フラグ
-            '', // 対象者_市減免後均等割額
-            '', // 対象者_県減免後均等割額
-            line[columnIndices[27]], // 扶養関連者宛名番号（2024/7/30 出力カラム追加対応に併せてリネーム・マッピングするインプットのカラムを指定）
-            '', // 扶養主_課税フラグ
-            '', // 扶養主_市免除後均等割額
-            '', // 扶養主_県免除後均等割額
-            line[columnIndices[28]], // 専従関連者宛名番号（2024/7/30 出力カラム追加対応に併せてリネーム・マッピングするインプットのカラムを指定）
-            '', // 専従主_課税フラグ
-            '', // 専従主_市減免後均等割額
-            '', // 専従主_県減免後均等割額
-            '', // 生活扶助認定年月日
-            '', // 生活扶助廃止年月日
-            childAmountFlg, // 多子加算対象者フラグ
-            line[columnIndices[26]], // 夫婦関連者宛名番号（2024/7/30 出力カラム追加対応にて追加・マッピングするインプットのカラムを指定）
-            line[columnIndices[25]], // 均等割額（2024/7/30 出力カラム追加対応にて追加・マッピングするインプットのカラムを指定）
-            line[columnIndices[24]] // 所得割額（2024/7/30 出力カラム追加対応にて追加・マッピングするインプットのカラムを指定）
-        ];
-    }
-
-    // 性別コードによるエラーがあれば例外を投げる
-    if (genderErrorAddressNums.length > 0) {
-        throw new Error('以下の住民の性別カラムに「1」「2」以外の値が入力されています。ファイルの確認をお願いします。\n' + genderErrorAddressNums.join('\n'))
-    }
-
-    // 続柄コードによるエラーがあれば例外を投げる
-    if (relationshipErrorAddressNums.length > 0) {
-        throw new Error('以下の住民の続柄１カラムが空です。ファイルの確認をお願いします。\n' + relationshipErrorAddressNums.join('\n'))
-    }
-
-    // 課税区分が「3（課税対象）」であることによるエラーがあれば例外を投げる
-    if (taxClassErrorAddressNums.length > 0) {
-        throw new Error('以下の住民は課税対象の住民です。ファイルの確認をお願いします。\n' + taxClassErrorAddressNums.join('\n'))
-    }
-
-    // 直接給付・確認書両方向け：給付対象者ファイルの出力用リストをカンマで結合し、改行で区切られた文字列に変換する
-    beneficiaryText = formatOutputFile(beneficiaryFileHeader, outputLines, NEWLINE_CHAR_CRLF);
-
-    // 直接給付の場合、給付対象者ファイルのみを返す
-    if (benefitType === 'push') {
-        return beneficiaryText;
-    }
-    // 確認書対象の場合、給付対象者ファイルと給付非対象者ファイル（＝中間ファイル）を返す
-    else if (benefitType === 'confirmation') {
-        // 中間ファイルの出力用リストをカンマで結合し、改行で区切られた文字列に変換する
-        midfileText = formatOutputFile(header, nonConfirmationTargetLines, NEWLINE_CHAR_CRLF);
-        // 給付対象者ファイルと給付非対象者ファイル（中間ファイル）の文字列を返す
-        return { beneficiaryText: beneficiaryText, midfileText: midfileText };
-    }
-}
-
-/**
-* 直接振込対象者ファイル（フラグ用ファイル）を作成する処理
-* @param {Array} columnIndices - カラムインデックスの配列
-* @param {Array} rows - 中間ファイルの行の配列
-* @param {String} benefitType - 給付形態を記載する。直接給付の場合は「push」確認書対象の場合は「confirmation」を設定する
-* @returns {String} 給付対象者ファイルの文字列
-*/
-function generatePushTargetfile(columnIndices, rows, benefitType) {
-    // 「直接振込対象者フラグ」カラムに出力する変数を定義する
-    let pushTargetType = '';
-    // 抽出した行を格納する変数を定義する
-    let filteredLines = [];
-    // 抽出対象の世帯番号の値を収集するためのセットを定義する
-    const beneficiaryHouseholdNumSet = new Set();
-    // 最終的に出力するカラム整形後データを格納するリストを定義する
-    const outputLines = [];
-    // 確認書対象抽出時の抽出条件である、課税区分（「1（非課税対象）」「2（均等割対象）」「4（未申告）」）を定義する
-    const taxClass = ['1', '2', '4'];
-    // 直接振込対象者ファイルのヘッダーを定義する
-    const pushTargetFileHeader = [
-        '宛名番号',
-        '直接振込対象者フラグ',
-        '課税区分キー',
-    ];
-
-    // 直接振込の場合の対象者抽出処理
-    if (benefitType === 'push') {
-        // 直接振込対象者フラグの値を「1（直接振込対象者）」に設定する
-        pushTargetType = '1';
-
-        // 名義人カラム・公金口座番号カラムが空でない（プッシュ対象世帯の世帯主）行の「世帯番号」を収集する
-        rows.forEach((line) => {
-            if (line[columnIndices[17]] && line[columnIndices[18]]) {
-                // 「世帯番号」の値をセットに追加する
-                beneficiaryHouseholdNumSet.add(line[columnIndices[9]]);
-            }
-        });
-
-        // 収集した世帯番号に属する行（対象世帯員全員）を抽出する
-        filteredLines = rows.filter((line) => {
-            return beneficiaryHouseholdNumSet.has(line[columnIndices[9]]);
-        });
-    }
-
-    // 確認書対象の場合の対象者抽出処理（及び、その世帯員行を抽出する）
-    else if (benefitType === 'confirmation') {
-        // 直接振込対象者フラグの値を「0（プッシュ対象者として設定しない）」に設定する
-        pushTargetType = '0';
-
-        // 課税区分が「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかであるかつ続柄１が「02（＝世帯主）」である行の「世帯番号」を収集する
-        rows.forEach((line) => {
-            if (taxClass.includes(line[columnIndices[23]]) && line[columnIndices[10]] === '02') {
-                // 「世帯番号」の値をセットに追加する
-                beneficiaryHouseholdNumSet.add(line[columnIndices[9]]);
-            }
-        });
-
-        filteredLines = rows.filter((line) => {
-            // 収集した世帯番号に属する行のみ後続処理を行う
-            if (beneficiaryHouseholdNumSet.has(line[columnIndices[9]])) {
-                // その世帯番号に属する全行を取得する
-                const householdLines = rows.filter((householdLine) => householdLine[columnIndices[9]] === line[columnIndices[9]]);
-                // その世帯のすべての行が課税区分が「1」「2」「4」のいずれかであるか確認
-                return householdLines.every((householdLine) => taxClass.includes(householdLine[columnIndices[23]]));
-            }
-            // 条件に合わない行は抽出対象から除外する
-            return false;
-        });
-    }
-
-    // 抽出した行のうち必要なカラムのみ出力用リストに追加する
-    filteredLines.forEach(line => {
-        outputLines.push([
-            line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号
-            pushTargetType, // 直接振込対象者フラグ
-            'R6S1SBS' // 課税区分キー（固定値「R6S1SBS」）
-        ]);
-    });
-
-    // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
-    return formatOutputFile(pushTargetFileHeader, outputLines, NEWLINE_CHAR_CRLF);
-}
-
 /* 以下、使いまわすメソッド（汎用処理）ここから */
 
 /**
@@ -4437,6 +4050,393 @@ function updateTaxInfoByTaxesNumLinkageFile(csvText1, csvText2) {
 
     // フィルタリングされた行をCSV形式に戻す
     return [midFileHeader, ...arrayFromMidFile.rows].map(line => line.join(',')).join('\r\n') + '\r\n';
+}
+
+/**
+* 給付対象者ファイルの形式に整形する処理。直接振込or確認書は第三引数を使用することによって判断し、抽出条件を出し分ける。
+* @param {Array} columnIndices - カラムインデックスの配列
+* @param {Array} rows - 中間ファイルの行の配列
+* @param {String} benefitType - 給付形態を記載する。直接給付の場合は「push」確認書対象の場合は「confirmation」を設定する
+* @param {Array} header - ヘッダー行の配列。プッシュ対象者抽出処理の場合は使用しないため、デフォルト値を設定する
+* @returns {String} 給付対象者ファイルの文字列
+* @returns {String} 中間ファイルの文字列（確認書対象者抽出処理の場合のみ）
+*/
+function generateBeneficiaryfile(columnIndices, rows, benefitType, header = []) {
+    // 直接給付・確認書両方向け：最終的にreturnする給付対象者ファイルのデータを格納する変数を定義する
+    let beneficiaryText = [];
+    // 直接給付・確認書両方向け：抽出対象世帯の世帯主行を格納するリストを定義する
+    let filteredLines = [];
+    // 直接給付・確認書両方向け：出力する行を格納するリストを定義する
+    let outputLines = [];
+    // 確認書向け：最終的にreturnする給付対象外住民ファイル（中間ファイル）のデータを格納する変数を定義する
+    let midfileText = [];
+    // 確認書向け：非抽出対象世帯の世帯主行を格納するリストを定義する
+    let nonFilteredLines = [];
+    // 確認書向け：確認書対象者と判定されなかった住民行を格納するリストを定義する
+    let nonConfirmationTargetLines = [];
+    // 性別カラムの変換時、中間ファイル内の性別コードが「1」「2」の場合にエラーを出力するため、エラー出力用のリストを定義する
+    const genderErrorAddressNums = [];
+    // 続柄カラムの変換時、中間ファイル⑦内の続柄１が空の場合にエラーを出力するため、エラー出力用のリストを定義する
+    const relationshipErrorAddressNums = [];
+    // 課税区分が「3」の場合、課税対象の住民（＝給付対象になりえない住民）が混ざっているということなので、エラーとして表示する。そのためのリストを定義する
+    const taxClassErrorAddressNums = [];
+    // 確認書対象抽出時の抽出条件である、課税区分（「1（非課税対象）」「2（均等割対象）」「4（未申告）」）を定義する
+    const taxClass = ['1', '2', '4'];
+    // 給付対象者ファイルのヘッダーを定義する
+    const beneficiaryFileHeader = [
+        '宛名番号',
+        '受給者宛名番号',
+        '氏名',
+        '氏名フリガナ',
+        '生年月日',
+        '性別',
+        '電話番号',
+        '郵便番号',
+        '住所',
+        '方書',
+        '異動元郵便番号',
+        '異動元住所',
+        '異動元方書',
+        '世帯番号',
+        '世帯主宛名番号',
+        '続柄',
+        '郵送対象者フラグ',
+        '通称名',
+        '通称名カナ',
+        'フォーマット種別',
+        '課税区分',
+        '住民カスタム属性',
+        '転入日',
+        '賦課期日居住者フラグ',
+        '照会対象フラグ',
+        '賦課無フラグ',
+        '課税保留フラグ',
+        '租税条約免除フラグ',
+        '生活扶助非課税フラグ',
+        '対象者_課税フラグ',
+        '対象者_市減免後均等割額',
+        '対象者_県減免後均等割額',
+        '扶養関連者宛名番号', // 項目名変更：2024/7/30 出力カラムの追加のため
+        '扶養主_課税フラグ',
+        '扶養主_市免除後均等割額',
+        '扶養主_県免除後均等割額',
+        '専従関連者宛名番号', // 項目名変更：2024/7/30 出力カラムの追加のため
+        '専従主_課税フラグ',
+        '専従主_市減免後均等割額',
+        '専従主_県減免後均等割額',
+        '生活扶助認定年月日',
+        '生活扶助廃止年月日',
+        '多子加算対象者フラグ',
+        '夫婦関連者宛名番号', // 項目追加：2024/7/30 出力カラムの追加のため
+        '均等割額', // 項目追加：2024/7/30 出力カラムの追加のため
+        '所得割額（定額減税前）' // 項目追加：2024/7/30 出力カラムの追加のため
+    ];
+
+    // 直接振込の場合の対象者抽出処理（口座名義カラム・口座番号カラムが空でない行（世帯主行）及び、世帯番号で紐づく世帯員行を抽出する）
+    if (benefitType === 'push') {
+        // 口座名義カラム・口座番号カラムが空でない（直接振込対象世帯の世帯主）行を抽出する
+        filteredLines = rows.filter(line => line[columnIndices[17]] && line[columnIndices[18]]);
+        // 口座名義カラム・口座番号カラムが空でない（直接振込対象世帯の世帯主）行毎に、宛名番号・世帯番号を取得後、出力用リストに追加する処理を行う
+        filteredLines.forEach(line => {
+            const addressNum = line[columnIndices[0]]; // 宛名番号を取得する
+            const householdNum = line[columnIndices[9]]; // 世帯番号を取得する
+
+            // 世帯主行を出力用リストに追加する。その際、「受給者宛名番号」は空に設定する
+            outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, ''));
+
+            // 世帯番号をキーにして、世帯主以外の世帯員レコードを取得する
+            const householdMemberLines = rows.filter(otherLine => otherLine[columnIndices[9]] === householdNum && otherLine !== line);
+
+            // 世帯員の行を出力用リストに追加する。その際、「受給者宛名番号」に世帯主の宛名番号を設定する
+            householdMemberLines.forEach(line => {
+                outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, addressNum));
+            });
+        });
+    }
+
+    // 確認書の場合の対象者抽出処理（課税区分が「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかである世帯主行及び、その世帯員行を抽出する）
+    else if (benefitType === 'confirmation') {
+        // 課税区分が「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかであるかつ続柄１が「02（世帯主）である行を抽出する
+        filteredLines = rows.filter(line => taxClass.includes(line[columnIndices[23]]) && line[columnIndices[10]] === '02');
+
+        // 課税区分が「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかでないかつ続柄１が「02（世帯主）である行を抽出する
+        nonFilteredLines = rows.filter(line => !taxClass.includes(line[columnIndices[23]]) && line[columnIndices[10]] === '02');
+
+        // 抽出した行（世帯主行）毎に、宛名番号・世帯番号を取得する。
+        filteredLines.forEach(line => {
+            const addressNum = line[columnIndices[0]]; // 宛名番号を取得する
+            const householdNum = line[columnIndices[9]]; // 世帯番号を取得する
+
+            // 世帯番号をキーにして、世帯主以外の世帯員レコードを取得する
+            const householdMemberLines = rows.filter(otherLine => otherLine[columnIndices[9]] === householdNum && otherLine !== line);
+
+            // 取得した同世帯番号の全員の課税区分も「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかであるかを確認する
+            const isAllTaxClassMatched = householdMemberLines.every(householdMemberLine => taxClass.includes(householdMemberLine[columnIndices[23]]));
+
+            // 世帯全員が該当する場合のみ抽出対象世帯とし、後続処理を実行する
+            if (isAllTaxClassMatched) {
+                // 世帯主行を出力用リストに追加する。その際、「受給者宛名番号」は空に設定する
+                outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, ''));
+
+                // 世帯員の行を出力用リストに追加する。その際、「受給者宛名番号」に世帯主の宛名番号を設定する
+                householdMemberLines.forEach(line => {
+                    outputLines.push(createOutputLineForBeneficiaryFile(line, columnIndices, addressNum));
+                });
+            }
+            // 世帯全員が該当しない場合は確認書対象外世帯と判断し、中間ファイル⑪に出力する
+            else {
+                nonConfirmationTargetLines.push(line); // 世帯主行
+                nonConfirmationTargetLines.push(...householdMemberLines); // 世帯主以外の世帯員行
+            }
+        });
+
+        // nonFilteredLinesに格納されている行の世帯番号を取得し、その世帯番号に含まれる行を全て中間ファイル出力用リストに追加する
+        nonFilteredLines.forEach(line => {
+            const householdNum = line[columnIndices[9]]; // 世帯番号を取得する
+            const householdLines = rows.filter(otherLine => otherLine[columnIndices[9]] === householdNum);
+            nonConfirmationTargetLines.push(...householdLines);
+        });
+    }
+
+    // 性別コードによるエラーがあれば例外を投げる
+    if (genderErrorAddressNums.length > 0) {
+        throw new Error('以下の住民の性別カラムに「1」「2」以外の値が入力されています。ファイルの確認をお願いします。\n' + genderErrorAddressNums.join('\n'))
+    }
+
+    // 続柄コードによるエラーがあれば例外を投げる
+    if (relationshipErrorAddressNums.length > 0) {
+        throw new Error('以下の住民の続柄１カラムが空です。ファイルの確認をお願いします。\n' + relationshipErrorAddressNums.join('\n'))
+    }
+
+    // 課税区分が「3（課税対象）」であることによるエラーがあれば例外を投げる
+    if (taxClassErrorAddressNums.length > 0) {
+        throw new Error('以下の住民は課税対象の住民です。ファイルの確認をお願いします。\n' + taxClassErrorAddressNums.join('\n'))
+    }
+
+    // 直接給付・確認書両方向け：給付対象者ファイルの出力用リストをカンマで結合し、改行で区切られた文字列に変換する
+    beneficiaryText = formatOutputFile(beneficiaryFileHeader, outputLines, NEWLINE_CHAR_CRLF);
+
+    // 直接給付の場合、給付対象者ファイルのみを返す
+    if (benefitType === 'push') {
+        return beneficiaryText;
+    }
+    // 確認書対象の場合、給付対象者ファイルと給付非対象者ファイル（＝中間ファイル）を返す
+    else if (benefitType === 'confirmation') {
+        // 中間ファイルの出力用リストをカンマで結合し、改行で区切られた文字列に変換する
+        midfileText = formatOutputFile(header, nonConfirmationTargetLines, NEWLINE_CHAR_CRLF);
+        // 給付対象者ファイルと給付非対象者ファイル（中間ファイル）の文字列を返す
+        return { beneficiaryText: beneficiaryText, midfileText: midfileText };
+    }
+}
+
+/**
+ * 抽出後の行のうち必要なカラムのみを抽出し、出力用の行を作成する処理
+ * @param {Array} line - 出力用の行を作成する元となる行
+ * @param {Array} columnIndices - 出力用の行を作成する元となる行のカラムインデックス
+ * @param {String} addressNum - 出力用の行に設定する「受給者宛名番号」（世帯主の場合は空（''）、他世帯員の場合は世帯主の宛名番号を引数として設定する）
+ * @returns {Array} 必要なカラムのみを抽出し、出力用の行を作成した結果
+*/
+function createOutputLineForBeneficiaryFile(line, columnIndices, addressNum) {
+    let semiProcessedAddressNum = addressNum;
+    // 引数「addressNum」が空でない場合、15桁の宛名番号に変換する
+    if (addressNum !== '') {
+        semiProcessedAddressNum = addressNum.toString().padStart(15, '0');
+    }
+    // 定数として定義しなおす
+    const processedAddressNum = semiProcessedAddressNum
+
+    // 性別コードを変換し、エラーがあればエラー出力用リストに対象の宛名番号を追加する
+    let genderCode = convertGenderCode(line[columnIndices[4]]);
+    if (genderCode === '') {
+        genderErrorAddressNums.push(line[columnIndices[0]]);
+    }
+
+    // 続柄コードを変換し、エラーがあればエラー出力用リストに対象の宛名番号を追加する
+    let relationshipCode = convertRelationshipCode(line[columnIndices[10]], line[columnIndices[11]], line[columnIndices[12]], line[columnIndices[13]]);
+    if (relationshipCode === '') {
+        relationshipErrorAddressNums.push(line[columnIndices[0]]);
+    }
+
+    // 多子加算対象住民に対してフラグを立てる（デフォルト値は「0（多子加算非対象）」を設定する）
+    let semiChildAmountFlg = '0';
+    // 日付比較用に、生年月日カラムの値をdate型にする
+    const birthDate = parseDate(line[columnIndices[3]]);
+    // 日付比較用に、H18(2006).4.2をdate型にする
+    const targetDate = new Date('2006-04-02 00:00:00');
+    // 多子加算判定を実施する（世帯主（続柄１が「02」）ではないかつ、生年月日がH18(2006).4.2以降である場合に多子加算対象者とする）
+    if (line[columnIndices[10]] !== '02' && birthDate >= targetDate) {
+        semiChildAmountFlg = '1';
+    }
+    // 定数として定義しなおす
+    const childAmountFlg = semiChildAmountFlg
+
+    // 通称名の使用有無を判断する処理（「外国人氏名優先区分」カラムに「3」が入力されている場合、通称名を入力する。デフォルト値は空）
+    let semiNickname = '';
+    let semiNicknameKana = '';
+    // 通称名の使用有無を判断する（「外国人氏名優先区分」カラムに「3」が入力されている場合、通称名を設定する）
+    if (line[columnIndices[22]] == '3') {
+        semiNickname = line[columnIndices[14]]; // 住基内「外国人通称名」カラムの値を入力
+        semiNicknameKana = line[columnIndices[15]]; // 住基内「外国人カナ通称名」カラムの値を入力
+    }
+    // 定数として定義しなおす
+    const nickname = semiNickname;
+    const nicknameKana = semiNicknameKana;
+
+    // インプット内「課税区分」の値を参照し、日本語化した文字列（「非課税対象」「均等割対象」）を、アウトプットの「住民カスタム属性」に出力する処理
+    const inputTaxClass = String(line[columnIndices[23]]); // 判定で数回使用するため、定数として定義しておく
+    let outputTaxClass = ''; // 出力用の変数を定義する
+
+    // インプットファイル内「続柄１」カラムの値が「02（＝世帯主）」である場合のみ、課税区分を判定する処理を行う
+    if (line[columnIndices[10]] === '02') {
+        // 以下、課税区分の値を参照し、日本語化した文字列を変数に格納する処理
+        if (inputTaxClass === '1') {
+            outputTaxClass = '非課税対象';
+        }
+        else if (inputTaxClass === '2') {
+            outputTaxClass = '均等割対象';
+        }
+        else if (inputTaxClass === '3') {
+            // 課税区分が「3」の場合、課税対象の住民（＝給付対象になりえない住民）が混ざっているということなので、エラーとして表示する
+            taxClassErrorAddressNums.push(line[columnIndices[0]]);
+        }
+        else if (inputTaxClass === '4') {
+            outputTaxClass = '未申告';
+        }
+    }
+
+    return [
+        // 以下、テンプレートのカラム  
+        line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号（15桁に変換する）
+        processedAddressNum, // 受給者宛名番号（世帯主の場合は空、他世帯員の場合は世帯主の宛名番号を15桁に変換した番号を設定する）
+        line[columnIndices[1]] || line[columnIndices[16]],// 漢字氏名（漢字氏名が無い場合は英字氏名を入力する）
+        line[columnIndices[2]], // カナ氏名
+        separateDate(line[columnIndices[3]], '/'), // 生年月日（「yyyy/mm/dd」形式に変換する）
+        genderCode, // 性別
+        excludeHyphen(line[columnIndices[5]]), // 電話番号（ハイフンを除去する）
+        excludeHyphen(line[columnIndices[6]]), // 郵便番号（ハイフンを除去する）
+        line[columnIndices[7]], // 住所
+        line[columnIndices[8]], // 方書
+        '', // 異動元郵便番号
+        '', // 異動元住所
+        '', // 異動元方書
+        line[columnIndices[9]].toString().padStart(15, '0'), // 世帯番号
+        '', // 世帯主宛名番号（世帯主行は空にする）
+        relationshipCode, // 続柄
+        '1', // 郵送対象者フラグ（郵送対象者のため「1」を設定）
+        nickname, // 外国人通称名
+        nicknameKana, // 外国人カナ通称名
+        '非課税均等割確認書', // フォーマット種別（固定値）
+        'R6S1SBS', // 課税区分（固定値）
+        outputTaxClass, // 住民カスタム属性（「課税区分」の値を参照し、日本語化した文字列を入力する）
+        // 以下、非課税・均等割特有のカラム
+        '', // 転入日
+        '', // 賦課期日居住者フラグ
+        '', // 照会対象フラグ
+        '', // 賦課無フラグ
+        '', // 課税保留フラグ
+        '', // 租税条約免除フラグ
+        '', // 生活扶助非課税フラグ
+        '', // 対象者_課税フラグ
+        '', // 対象者_市減免後均等割額
+        '', // 対象者_県減免後均等割額
+        line[columnIndices[27]], // 扶養関連者宛名番号（2024/7/30 出力カラム追加対応に併せてリネーム・マッピングするインプットのカラムを指定）
+        '', // 扶養主_課税フラグ
+        '', // 扶養主_市免除後均等割額
+        '', // 扶養主_県免除後均等割額
+        line[columnIndices[28]], // 専従関連者宛名番号（2024/7/30 出力カラム追加対応に併せてリネーム・マッピングするインプットのカラムを指定）
+        '', // 専従主_課税フラグ
+        '', // 専従主_市減免後均等割額
+        '', // 専従主_県減免後均等割額
+        '', // 生活扶助認定年月日
+        '', // 生活扶助廃止年月日
+        childAmountFlg, // 多子加算対象者フラグ
+        line[columnIndices[26]], // 夫婦関連者宛名番号（2024/7/30 出力カラム追加対応にて追加・マッピングするインプットのカラムを指定）
+        line[columnIndices[25]], // 均等割額（2024/7/30 出力カラム追加対応にて追加・マッピングするインプットのカラムを指定）
+        line[columnIndices[24]] // 所得割額（2024/7/30 出力カラム追加対応にて追加・マッピングするインプットのカラムを指定）
+    ];
+}
+
+/**
+* 直接振込対象者ファイル（フラグ用ファイル）を作成する処理
+* @param {Array} columnIndices - カラムインデックスの配列
+* @param {Array} rows - 中間ファイルの行の配列
+* @param {String} benefitType - 給付形態を記載する。直接給付の場合は「push」確認書対象の場合は「confirmation」を設定する
+* @returns {String} 給付対象者ファイルの文字列
+*/
+function generatePushTargetfile(columnIndices, rows, benefitType) {
+    // 「直接振込対象者フラグ」カラムに出力する変数を定義する
+    let pushTargetType = '';
+    // 抽出した行を格納する変数を定義する
+    let filteredLines = [];
+    // 抽出対象の世帯番号の値を収集するためのセットを定義する
+    const beneficiaryHouseholdNumSet = new Set();
+    // 最終的に出力するカラム整形後データを格納するリストを定義する
+    const outputLines = [];
+    // 確認書対象抽出時の抽出条件である、課税区分（「1（非課税対象）」「2（均等割対象）」「4（未申告）」）を定義する
+    const taxClass = ['1', '2', '4'];
+    // 直接振込対象者ファイルのヘッダーを定義する
+    const pushTargetFileHeader = [
+        '宛名番号',
+        '直接振込対象者フラグ',
+        '課税区分キー',
+    ];
+
+    // 直接振込の場合の対象者抽出処理
+    if (benefitType === 'push') {
+        // 直接振込対象者フラグの値を「1（直接振込対象者）」に設定する
+        pushTargetType = '1';
+
+        // 名義人カラム・公金口座番号カラムが空でない（プッシュ対象世帯の世帯主）行の「世帯番号」を収集する
+        rows.forEach((line) => {
+            if (line[columnIndices[17]] && line[columnIndices[18]]) {
+                // 「世帯番号」の値をセットに追加する
+                beneficiaryHouseholdNumSet.add(line[columnIndices[9]]);
+            }
+        });
+
+        // 収集した世帯番号に属する行（対象世帯員全員）を抽出する
+        filteredLines = rows.filter((line) => {
+            return beneficiaryHouseholdNumSet.has(line[columnIndices[9]]);
+        });
+    }
+
+    // 確認書対象の場合の対象者抽出処理（及び、その世帯員行を抽出する）
+    else if (benefitType === 'confirmation') {
+        // 直接振込対象者フラグの値を「0（プッシュ対象者として設定しない）」に設定する
+        pushTargetType = '0';
+
+        // 課税区分が「1（非課税対象）」「2（均等割対象）」「4（未申告）」のいずれかであるかつ続柄１が「02（＝世帯主）」である行の「世帯番号」を収集する
+        rows.forEach((line) => {
+            if (taxClass.includes(line[columnIndices[23]]) && line[columnIndices[10]] === '02') {
+                // 「世帯番号」の値をセットに追加する
+                beneficiaryHouseholdNumSet.add(line[columnIndices[9]]);
+            }
+        });
+
+        filteredLines = rows.filter((line) => {
+            // 収集した世帯番号に属する行のみ後続処理を行う
+            if (beneficiaryHouseholdNumSet.has(line[columnIndices[9]])) {
+                // その世帯番号に属する全行を取得する
+                const householdLines = rows.filter((householdLine) => householdLine[columnIndices[9]] === line[columnIndices[9]]);
+                // その世帯のすべての行が課税区分が「1」「2」「4」のいずれかであるか確認
+                return householdLines.every((householdLine) => taxClass.includes(householdLine[columnIndices[23]]));
+            }
+            // 条件に合わない行は抽出対象から除外する
+            return false;
+        });
+    }
+
+    // 抽出した行のうち必要なカラムのみ出力用リストに追加する
+    filteredLines.forEach(line => {
+        outputLines.push([
+            line[columnIndices[0]].toString().padStart(15, '0'), // 宛名番号
+            pushTargetType, // 直接振込対象者フラグ
+            'R6S1SBS' // 課税区分キー（固定値「R6S1SBS」）
+        ]);
+    });
+
+    // フィルタリングされた行を再度カンマで結合し、改行で区切られた文字列に変換
+    return formatOutputFile(pushTargetFileHeader, outputLines, NEWLINE_CHAR_CRLF);
 }
 
 /**
