@@ -3057,9 +3057,21 @@ function determineTaxClassfromOldAddressNum() {
                         // 「消除フラグ」が「消除者」である行を全行取得する
                         const eliminationData = rows.filter(data => data[eliminationFlagIndex] === '消除者');
                         // 「消除フラグ」が「消除者」である行の中で、「住民日」が2024/1/1以前かつデータ内で一番新しい行を取得する
-                        const latestEliminationData = eliminationData.reduce((a, b) => {
-                            return parseDate(a[eliminationDateIndex]) > parseDate(b[eliminationDateIndex]) ? a : b;
+                        let latestEliminationData = [];
+
+                        // 抽出した行の中から最も新しい「住民日」の行を見つける処理
+                        eliminationData.forEach(data => {
+                            // 「消除日」を取得する
+                            const currentDate = parseDate(data[eliminationDateIndex]);
+                            // latestEliminationDataに格納されている行の「消除日」カラムの値を取得する
+                            const latestDate = parseDate(latestEliminationData[eliminationDateIndex]);
+
+                            // チェックしている行の日付がこれまでの最新の日付より新しい場合、最新の日付の行として配列に格納する
+                            if (currentDate > latestDate) {
+                                latestEliminationData = data;
+                            }
                         });
+
                         // 「消除フラグ」が「消除者」である行の中で、「住民日」が2024/1/1以前かつデータ内で一番新しい行の宛名番号を取得する（＝旧宛名番号）
                         oldAddressNum = latestEliminationData[addressNumIndex2];
 
@@ -3068,7 +3080,7 @@ function determineTaxClassfromOldAddressNum() {
                         if (matchedTaxMasterData) {
                             // 旧宛名番号と一致する行の「金額予備１０」「均等割額」「更正事由」を取得する（Number型での取得時、デフォルトでは空だと0になるため、空の場合は空文字にする
                             amountPreliminary = matchedTaxMasterData[amountPreliminaryIndex] ? Number(matchedTaxMasterData[amountPreliminaryIndex]) : '';
-                            equalPercentage = matchedTaxMasterData[equalPercentageIndex2] ? Number(matchedTaxMasterData[equalPercentageIndex2]) : ''; 
+                            equalPercentage = matchedTaxMasterData[equalPercentageIndex2] ? Number(matchedTaxMasterData[equalPercentageIndex2]) : '';
                             causeForCorrection = String(matchedTaxMasterData[causeForCorrectionIndex2]);
 
                             // 中間ファイル⑩にて、新宛名番号と一致する行を検索する
@@ -3105,19 +3117,20 @@ function determineTaxClassfromOldAddressNum() {
                                 }
                             }
                         }
-                        // // 税情報マスタにて、旧宛名番号と一致する行が存在しない場合はエラーを表示する
-                        // else if (!matchedTaxMasterData) {
+                        // 税情報マスタにて、旧宛名番号と一致する行が存在しない場合はエラーを表示する
+                        // →税情報が無い場合も考えられるため、ない場合は更新スキップで良い
+                        // else {
                         //     throw new Error('■住民票コード：' + residentId + ' >> 税情報マスタに該当する行が存在しませんでした。インプットファイルを確認してください。');
                         // }
                     }
                     // 「現存者」の「住民日」が2024/1/2より前の場合はありえないため、エラーを表示する
-                    else if (residentDate < targetDataForresidentDate) {
-                        throw new Error('■住民票コード：' + residentId + ' >> 現存者かつ住民日が2024/1/2より前の行が存在しました。インプットファイルを確認してください。');
+                    else {
+                        throw new Error('■住民票コード：' + residentId + ' >> 同一住民表コードの行が複数行存在しますが、その中に現存者かつ住民日が2024/1/2より前の行が存在しました。インプットファイルを確認してください。');
                     }
                 }
                 // 同住民表コードの行が複数行あるのにも関わらず、その中に消除フラグが「現存者」である行が存在しない場合はエラーを表示する
-                else if (existFlagData){
-                    throw new Error('■住民票コード：' + residentId + ' >> 消除フラグ「現存者」の行が存在しませんでした。インプットファイルを確認してください。');
+                else {
+                    throw new Error('■住民票コード：' + residentId + ' >>  同一住民表コードの行が複数行存在しますが、その中に消除フラグ「現存者」の行が存在しませんでした。インプットファイルを確認してください。');
                 }
             }
         }
@@ -3679,7 +3692,7 @@ function generateFilesforConfirmationTargetImport() {
                 logger.warn('■ファイル名：' + NO_TAX_INFO_FILE + ' >> 出力対象レコードが存在しませんでした。');
             } else {
                 noTaxInfoTextFlg = true;
-            }            
+            }
 
             // 各ファイルをダウンロード            
             if (beneficiaryTextFlg) {
