@@ -201,17 +201,28 @@
                     <input type="file" id="file39" accept=".csv"><br><br>
                     <label for="file40">「番号連携エラー住民のうち、照会が完了している住民一覧」ファイルをアップロードしてください:</label>
                     <input type="file" id="file40" accept=".csv"><br><br>
-                    <button type="button" onclick="updateTaxInfoByNumLinkageErrorResidentsFile()">中間ファイル⑩_番号連携エラー取込み済み を作成する</button>
+                    <button type="button" onclick="updateTaxInfoByNumLinkageErrorResidentsFile()">中間ファイル⑩_番号連携エラー取込み済み
+                        を作成する</button>
                 </form>
 
                 <h1>追加対応4.中間ファイルの「所得割額」の値を「金額予備１０」の値で更新する<br>
-                ※事前に追加対応1を実施し、最新の税情報マスタを作成してから本STEPを実施してください。</h1>
+                    ※事前に追加対応1を実施し、最新の税情報マスタを作成してから本STEPを実施してください。</h1>
                 <form id="csvForm24">
                     <label for="file41">中間ファイル⑩をアップロードしてください:</label>
                     <input type="file" id="file41" accept=".csv"><br><br>
                     <label for="file42">税情報マスタをアップロードしてください:</label>
                     <input type="file" id="file42" accept=".csv"><br><br>
                     <button type="button" onclick="amountReserveSupport()">中間ファイル⑩_「金額予備１０」対応済み を作成する</button>
+                </form>
+
+                <h1>追加対応5.あああああああ<br>
+                    ※事前に追加対応1を実施し、最新の税情報マスタを作成してから本STEPを実施してください。</h1>
+                <form id="csvForm25">
+                    <label for="file43">中間ファイル⑩をアップロードしてください:</label>
+                    <input type="file" id="file43" accept=".csv"><br><br>
+                    <label for="file44">税情報マスタをアップロードしてください:</label>
+                    <input type="file" id="file44" accept=".csv"><br><br>
+                    <button type="button" onclick="exclusionByDependents()">中間ファイル⑩_扶養関連除外対応済み を作成する</button>
                 </form>
 
                 <!--<h1>14.番号連携照会結果（税情報）ファイルから課税区分を判別し、中間ファイルを更新する</h1>
