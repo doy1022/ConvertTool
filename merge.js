@@ -2103,7 +2103,6 @@ function additionalExclusion() {
             }
         }
 
-
         // dependentTaxpayerSet内、「扶養者課税区分」が「2（＝均等割のみ課税）」もしくは「3（＝課税）」であるデータのみ抽出する（後続処理をわかりやすくするため）
         const filteredDependentTaxpayerSet = dependentTaxpayerSet.filter(dependentTaxpayer => dependentTaxpayer['扶養者課税区分'] === '2' || dependentTaxpayer['扶養者課税区分'] === '3');
 
@@ -2146,7 +2145,6 @@ function additionalExclusion() {
         });
         return output.join('\r\n') + '\r\n';
     }
-
 }
 
 /* 9.中間ファイル⑥と公金口座照会結果ファイルをマージする処理 */
