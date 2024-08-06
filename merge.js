@@ -3693,7 +3693,7 @@ function exclusionByDependents() {
                     midRow[incomeBracketIndex] = amountPreliminary;
                 }
                 // 「金額予備１０」の値が空の場合、「所得割額」の値を中間ファイル⑩の「所得割額」カラムに入力する
-                else if (amountPreliminary == '') {
+                else {
                     midRow[incomeBracketIndex] = incomeBracket;
                 }
 
