@@ -2831,20 +2831,18 @@ function determineTaxClassfromOldAddressNum() {
                     newAddressNum = existFlagData[addressNumIndex2];
                     // 「消除フラグ」が「消除者」である行を全行取得する
                     eliminationData = rows.filter(data => data[eliminationFlagIndex] === '消除者');
-                    // 「住民日」の比較用に、latestEliminationDataに初期値として最初の行を格納する
-                    latestEliminationData = eliminationData[0];
+                    // 「住民日」が2024/1/1以前（2024/1/1を含む）かつ、一番新しい行を取得する
+                    latestEliminationData = eliminationData.reduce((a, b) => {
+                        const dateA = parseDate(a[residentDateIndex]);
+                        const dateB = parseDate(b[residentDateIndex]);
 
-                    // 抽出した行（「消除フラグ」が「消除者」である行）の中から、「住民日」が2024/1/2より前かつ最も新しい行を見つけ、取得する処理
-                    eliminationData.forEach(data => {
-                        // 「住民日」を取得する
-                        let currentDate = parseDate(data[residentDateIndex]);
-                        // latestEliminationDataに格納されている行の「住民日」カラムの値を取得する
-                        let latestDate = parseDate(latestEliminationData[residentDateIndex]);
+                        // a が条件を満たさない場合、b を選択
+                        if (dateA >= targetDataForresidentDate) return b;
+                        // b が条件を満たさない場合、a を選択
+                        if (dateB >= targetDataForresidentDate) return a;
 
-                        // チェックしている行の「住民日」が2024/1/2より前かつ、latestEliminationData内の「住民日」より新しい場合、最新の日付の行として配列に格納する
-                        if (currentDate < targetDataForresidentDate && currentDate > latestDate) {
-                            latestEliminationData = data;
-                        }
+                        // 両方が条件を満たす場合、最新の日付を選択
+                        return dateA > dateB ? a : b;
                     });
 
                     // 「「消除フラグ」が「消除者」である行の中で、「住民日」が一番新しい行」の宛名番号を取得する（＝旧宛名番号）
