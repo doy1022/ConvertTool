@@ -2648,7 +2648,7 @@ function determineTaxClassfromOldAddressNum() {
             if (results.filter(result => result).length === file_num) {
                 try {
                     // 実際の課税区分更新処理
-                    const mergedCSV = mergeCSVwithOldAddressNum(results[0], results[1], results[2]);
+                    const mergedCSV = mergeCSVwithOldAddressNum(...results);
                     // 課税対象の住民を除外する処理
                     const excludeTaxableText = filterTaxExcluded(mergedCSV);
                     // アウトプットファイルのダウンロード処理
@@ -2665,11 +2665,11 @@ function determineTaxClassfromOldAddressNum() {
         reader.readAsText(files[index]);
     });
 
-    function mergeCSVwithOldAddressNum(csvText1, csvText2, csvText3) {
+    function mergeCSVwithOldAddressNum(...csvTexts) {
         // 各CSVファイルをヘッダーとデータ行に分解し、配列に格納する
-        const arrayFromMidFile = parseCSV(csvText1); // 中間ファイル⑨
-        const arrayFromOldAdressFile = parseCSV(csvText2); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイル
-        const arrayFromTaxMasterFile = parseCSV(csvText3); // 税情報マスタファイル
+        const arrayFromMidFile = parseCSV(csvTexts[0]); // 中間ファイル⑨
+        const arrayFromOldAdressFile = parseCSV(csvTexts[1]); // 現宛名番号の住民票コードに紐づく旧宛名番号ファイル
+        const arrayFromTaxMasterFile = parseCSV(csvTexts[2]); // 税情報マスタファイル
 
         // 各ファイルのヘッダー行を取得する
         const midFileHeader = arrayFromMidFile.header;
