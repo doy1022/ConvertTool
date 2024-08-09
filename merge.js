@@ -1919,9 +1919,11 @@ function additionalExclusion() {
         // 個人基本マスタヘッダー内の「ＦＩ－」を取り除く
         parsedCSVs[2].header = removeStrFromHeader(parsedCSVs[2].header, "ＦＩ－");
         // 中間ファイル⑥の全ヘッダーと、各ファイルの必要カラムのヘッダーをマージする
-        const fullHeader = Array.from(new Set([...parsedCSVs[0].header, "配偶者特別控除", "個人基本廃止理由", "夫婦関連者種別コード", "夫婦関連者宛名番号", "扶養関連者宛名番号", "専従関連者種別コード", "専従関連者宛名番号"]));
+        const fullHeader = Array.from(new Set([...parsedCSVs[0].header, "配偶者特別控除", "個人基本廃止理由", "夫婦関連者種別コード", "夫婦関連者宛名番号", "扶養関連者宛名番号", "専従関連者種別コード", "専従関連者宛名番号", "扶養者宛名番号", "扶養者課税区分"]));
         // 出力用のCSVデータを定義する
         const output = [fullHeader.join(',')];
+        // 除外された行を別途CSV出力するので、そのための配列を定義しておく
+        const excludedRows = [];
         // 各CSVファイルの「宛名番号」カラムのインデックスを取得し、配列に保存する→各ファイルで「宛名番号」がどの位置にあるかを把握する
         const addressIndex = parsedCSVs.map(parsed => parsed.header.indexOf('宛名番号'));
 
@@ -1978,172 +1980,99 @@ function additionalExclusion() {
             }
         });
 
-        // 4つの条件から扶養を受けている住民（被扶養者）を検索し、該当レコードの世帯番号、関連者宛名番号（扶養者の宛名番号）、扶養形式（後続処理に使用するフラグ）を配列に格納する
-        const dependentTaxpayerSet = [];
-
-        map.forEach(value => {
-            // 条件① : 「夫婦関連者種別コード」が11,13,15,17,19,1B,1D,1F,1Hのいずれかであるかつ、「夫婦関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
-            if (['11', '13', '15', '17', '19', '1B', '1D', '1F', '1H'].includes(value['夫婦関連者種別コード']) && value['夫婦関連者宛名番号'] && !value['個人基本廃止理由']) {
-                dependentTaxpayerSet.push({
-                    世帯番号: value['世帯番号'],
-                    扶養者宛名番号: value['夫婦関連者宛名番号'],
-                    扶養形式: '控配'
-                });
-            }
-            // 条件② : 条件①に当てはまらないかつ、「扶養関連者宛名番号」が入力されているかつ、個人基本廃止理由が空であるレコードを検索する
-            else if (value['扶養関連者宛名番号'] && !value['個人基本廃止理由']) {
-                dependentTaxpayerSet.push({
-                    世帯番号: value['世帯番号'],
-                    扶養者宛名番号: value['扶養関連者宛名番号'],
-                    扶養形式: '扶養'
-                });
-            }
-            // 条件③ : 条件①②に当てはまらないかつ、「夫婦関連者種別コード」が10であるかつ、「配偶者特別控除」が0より大きいかつ、「夫婦関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
-            else if (value['夫婦関連者種別コード'] === '10' && value['配偶者特別控除'] > 0 && value['夫婦関連者宛名番号'] && !value['個人基本廃止理由']) {
-                dependentTaxpayerSet.push({
-                    世帯番号: value['世帯番号'],
-                    扶養者宛名番号: value['夫婦関連者宛名番号'],
-                    扶養形式: '配偶者'
-                });
-            }
-            // 条件④ : 条件①②③に当てはまらないかつ、「専従関連者種別コード」が41であるかつ、「専従関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
-            else if (value['専従関連者種別コード'] === '41' && value['専従関連者宛名番号'] && !value['個人基本廃止理由']) {
-                dependentTaxpayerSet.push({
-                    世帯番号: value['世帯番号'],
-                    扶養者宛名番号: value['専従関連者宛名番号'],
-                    扶養形式: '専従'
-                });
-            }
-        });
-
-        //     // dependentTaxpayerSetの各データの扶養者宛名番号について、税情報マスタファイル内「宛名番号」カラムに検索をかける
-        //     // todo 引数、forでいいかも　Setじゃない奴の名前修正
-        //     dependentTaxpayerSet.forEach((dependentTaxpayer, index) => {
-        //         // 検索ヒットした行の更正事由、所得割額、均等割額の値を参照し、課税区分判定を実施する
-        //         parsedCSVs[1].rows.forEach(row => {
-        //             if (row[parsedCSVs[1].header.indexOf('宛名番号')] === dependentTaxpayerSet[index]['扶養者宛名番号']) {
-        //                 const causeForCorrection = String(row[parsedCSVs[1].header.indexOf('更正事由')]); // 更正事由
-        //                 const incomePercentage = Number(row[parsedCSVs[1].header.indexOf('所得割額')]); // 所得割額
-        //                 const equalPercentage = Number(row[parsedCSVs[1].header.indexOf('均等割額')]); // 均等割額
-        //                 let taxClass; // 最終的に配列に格納する課税区分
-
-        //                 // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
-        //                 if (incomePercentage == 0 && equalPercentage == 0 && !causeForCorrection.startsWith("03")) {
-        //                     taxClass = '1';
-        //                 }
-        //                 // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
-        //                 else if (incomePercentage == 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
-        //                     taxClass = '2';
-        //                 }
-        //                 // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
-        //                 else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
-        //                     taxClass = '3';
-        //                 }
-        //                 // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
-        //                 else if (causeForCorrection.startsWith("03")) {
-        //                     taxClass = '4';
-        //                 }
-        //                 else {
-        //                     taxClass = '';
-        //                 }
-
-        //                 // 課税区分を配列に追加格納する
-        //                 dependentTaxpayerSet[index] = {
-        //                     ...dependentTaxpayerSet[index],
-        //                     扶養者課税区分: taxClass
-        //                 };
-        //             }
-        //         });
-        //     });
-
         const headerMap = parsedCSVs[1].header.reduce((map, header, index) => {
             map[header] = index;
             return map;
         }, {});
 
-        for (let index = 0; index < dependentTaxpayerSet.length; index++) {
-            const dependentTaxpayer = dependentTaxpayerSet[index];
-            // 宛名番号が一致する行をフィルタリング
-            const targetRows = parsedCSVs[1].rows.filter(row =>
-                row[headerMap['宛名番号']] === dependentTaxpayer['扶養者宛名番号']
-            );
-
-            for (let i = 0; i < targetRows.length; i++) {
-                const row = targetRows[i];
-                const causeForCorrection = String(row[headerMap['更正事由']]); // 更正事由
-                const incomePercentage = Number(row[headerMap['所得割額']]); // 所得割額
-                const equalPercentage = Number(row[headerMap['均等割額']]); // 均等割額
-                let taxClass; // 最終的に配列に格納する課税区分
-
-                // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
-                if (incomePercentage === 0 && equalPercentage === 0 && !causeForCorrection.startsWith("03")) {
-                    taxClass = '1';
-                }
-                // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
-                else if (incomePercentage === 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
-                    taxClass = '2';
-                }
-                // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
-                else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
-                    taxClass = '3';
-                }
-                // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
-                else if (causeForCorrection.startsWith("03")) {
-                    taxClass = '4';
-                }
-                else {
-                    taxClass = '';
-                }
-
-                // 課税区分を配列に追加格納する
-                dependentTaxpayerSet[index] = {
-                    ...dependentTaxpayerSet[index],
-                    扶養者課税区分: taxClass
-                };
+        map.forEach(value => {
+            // 下記4つの条件から、扶養を受けている住民（被扶養者）を判定し、該当レコードの「扶養者宛名番号」カラムに値を入力する
+            // 条件① : 「夫婦関連者種別コード」が11,13,15,17,19,1B,1D,1F,1Hのいずれかであるかつ、「夫婦関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
+            if (['11', '13', '15', '17', '19', '1B', '1D', '1F', '1H'].includes(value['夫婦関連者種別コード']) && value['夫婦関連者宛名番号'] && !value['個人基本廃止理由']) {
+                value['扶養者宛名番号'] = value['夫婦関連者宛名番号'];
             }
+            // 条件② : 条件①に当てはまらないかつ、「扶養関連者宛名番号」が入力されているかつ、個人基本廃止理由が空であるレコードを検索する
+            else if (value['扶養関連者宛名番号'] && !value['個人基本廃止理由']) {
+                value['扶養者宛名番号'] = value['扶養関連者宛名番号'];
+            }
+            // 条件③ : 条件①②に当てはまらないかつ、「夫婦関連者種別コード」が10であるかつ、「配偶者特別控除」が0より大きいかつ、「夫婦関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
+            else if (value['夫婦関連者種別コード'] === '10' && value['配偶者特別控除'] > 0 && value['夫婦関連者宛名番号'] && !value['個人基本廃止理由']) {
+                value['扶養者宛名番号'] = value['夫婦関連者宛名番号'];
+            }
+            // 条件④ : 条件①②③に当てはまらないかつ、「専従関連者種別コード」が41であるかつ、「専従関連者宛名番号」が入力されているかつ、「個人基本廃止理由」が空であるレコードを検索する
+            else if (value['専従関連者種別コード'] === '41' && value['専従関連者宛名番号'] && !value['個人基本廃止理由']) {
+                value['扶養者宛名番号'] = value['専従関連者宛名番号'];
+            }
+
+            // 該当行の「扶養者宛名番号」カラムの値が空でない場合、「扶養者宛名番号」の値を「税情報マスタ」内で検索し、課税判定を行う
+            if (value['扶養者宛名番号']) {
+                // 「税情報マスタ」から「扶養者宛名番号」の値を検索する
+                const taxInfo = parsedCSVs[1].rows.find(row => row[addressIndex[1]] === value['扶養者宛名番号']);
+                // 検索ヒットした行の税情報を用いて課税区分を判定し、該当レコードの「扶養者課税区分」カラムに値を記載する
+                if (taxInfo) {
+                    const causeForCorrection = String(taxInfo[headerMap['更正事由']]); // 更正事由
+                    const incomePercentage = Number(taxInfo[headerMap['所得割額']]); // 所得割額
+                    const equalPercentage = Number(taxInfo[headerMap['均等割額']]); // 均等割額
+
+                    // 「所得割額」が0かつ、「均等割額」が0かつ、「更正事由」の先頭２桁が03でないものを非課税(1)判定
+                    if (incomePercentage === 0 && equalPercentage === 0 && !causeForCorrection.startsWith("03")) {
+                        value['扶養者課税区分'] = '非課税';
+                    }
+                    // 「所得割額」が0かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを均等割りのみ課税(2)判定
+                    else if (incomePercentage === 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+                        value['扶養者課税区分'] = '均等割のみ課税';
+                    }
+                    // 「所得割額」が1以上かつ、「均等割額」が1以上かつ、「更正事由」の先頭２桁が03でないものを課税(3)判定
+                    else if (incomePercentage > 0 && equalPercentage > 0 && !causeForCorrection.startsWith("03")) {
+                        value['扶養者課税区分'] = '課税';
+                    }
+                    // 「更正事由」の先頭２桁が03であるものは、「所得割額」「所得割額」に関わらず未申告(4)判定
+                    else if (causeForCorrection.startsWith("03")) {
+                        value['扶養者課税区分'] = '未申告';
+                    }
+                    else {
+                        value['扶養者課税区分'] = '';
+                    }
+                }
+            }
+        });
+
+        // 同世帯番号の住民行をグループ化する
+        const groupedMap = new Map();
+        map.forEach(value => {
+            const householdNum = value['世帯番号'];
+            if (!groupedMap.has(householdNum)) {
+                groupedMap.set(householdNum, []);
+            }
+            groupedMap.get(householdNum).push(value);
+        });
+
+        // 各グループ内の住民行すべての「扶養者課税区分」が「均等割のみ課税」か「課税」であるかを判定し、全員が条件に該当していればその世帯の行を全て除外する
+        groupedMap.forEach(group => {
+            const allMatchJudge = group.every(value => value['扶養者課税区分'] === '均等割のみ課税' || value['扶養者課税区分'] === '課税');
+            if (allMatchJudge) {
+                group.forEach(value => map.delete(value['宛名番号']));
+                // 除外された行を別途CSV出力するため、配列に追加する
+                excludedRows.push(...group);
+            }
+        });
+
+        // 除外された行がある場合、別途CSV出力する
+        if (excludedRows.length > 0) {
+            const excludedHeader = fullHeader;
+            const excludedOutputRows = excludedRows.map(value => fullHeader.map(header => value[header] || '').join(','));
+            const excludedText = [excludedHeader, ...excludedOutputRows].join('\r\n') + '\r\n';
+            downloadCSV(excludedText, '世帯全員が課税者に扶養されている住民データ.csv');
         }
 
-        // dependentTaxpayerSet内、「扶養者課税区分」が「2（＝均等割のみ課税）」もしくは「3（＝課税）」であるデータのみ抽出する（後続処理をわかりやすくするため）
-        const filteredDependentTaxpayerSet = dependentTaxpayerSet.filter(dependentTaxpayer => dependentTaxpayer['扶養者課税区分'] === '2' || dependentTaxpayer['扶養者課税区分'] === '3');
-
-        // 抽出したデータごとに後続処理を実施する
-        filteredDependentTaxpayerSet.forEach(filtereddependentTaxpayer => {
-            // 検索ヒットした住民の扶養者宛名番号カラムの値をいれるための配列（後続処理で判定用として使用する配列）を定義する
-            const relatedAddressNums = [];
-            const keysToDelete = [];
-
-            // 扶養形式に応じて取得するカラムを決定する
-            const columnMap = {
-                '控配': '夫婦関連者宛名番号',
-                '配偶者': '夫婦関連者宛名番号',
-                '扶養': '扶養関連者宛名番号',
-                '専従': '専従関連者宛名番号'
-            };
-            const targetColumn = columnMap[filtereddependentTaxpayer['扶養形式']];
-
-            map.forEach((value, key) => {
-                if (value['世帯番号'] === filtereddependentTaxpayer['世帯番号']) {
-                    // 該当するカラムの値を取得し、空文字列にフォールバックする
-                    const addressNum = value[targetColumn] || '';
-                    relatedAddressNums.push(addressNum);
-                    keysToDelete.push(key);
-                }
-            });
-
-            // 取得した扶養者宛名番号配列の中に、filteredDependentTaxpayerSetの「扶養者宛名番号」と一致しないものがあるか判定する
-            const allMatchJudge = relatedAddressNums.every(addressNum => addressNum === filtereddependentTaxpayer['扶養者宛名番号']);
-
-            // 判定結果でTrueの場合、同世帯番号に属する全レコードをmapから除外する
-            if (allMatchJudge) {
-                keysToDelete.forEach(key => map.delete(key));
-            }
-        });
-
+        // マップの値をCSV形式に変換する
+        const outputRows = [];
         map.forEach(value => {
             const row = fullHeader.map(header => value[header] || '');
-            output.push(row.join(','));
+            outputRows.push(row.join(','));
         });
-        return output.join('\r\n') + '\r\n';
+        // フィルタリングされた行をCSV形式に戻す
+        return [fullHeader, ...outputRows].join('\r\n') + '\r\n';
     }
 }
 
